@@ -1,8 +1,7 @@
 import { DietCodeMessage, DietCodeSayTool } from "@shared/ExtensionMessage"
 import { StringRequest } from "@shared/proto/dietcode/common"
-import { ChevronRight } from "lucide-react"
+import { Check, ChevronRight } from "lucide-react"
 import { memo, useCallback, useMemo, useState } from "react"
-import { TypewriterText } from "@/components/chat/TypewriterText"
 import { cleanPathPrefix } from "@/components/common/CodeAccordian"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -15,12 +14,15 @@ interface ToolGroupRendererProps {
 	isLastGroup: boolean
 }
 
-interface ToolWithReasoning {
+interface WorkspaceToolReference {
 	tool: DietCodeMessage
 	parsedTool: DietCodeSayTool
-	reasoning?: string
-	isActive?: boolean
-	activityText?: string
+}
+
+interface ActiveWorkspaceTool {
+	tool: DietCodeMessage
+	parsedTool: DietCodeSayTool
+	activityText: string
 }
 
 const EXPANDABLE_TOOLS = new Set(["listFilesTopLevel", "listFilesRecursive", "listCodeDefinitionNames", "searchFiles"])
@@ -42,14 +44,18 @@ const getActivityText = (tool: DietCodeSayTool): string | null => {
 
 	switch (tool.tool) {
 		case "readFile":
-			return tool.path ? `Taking a look at ${cleanedPath}…` : null
+			return tool.path ? `Reading file: ${cleanedPath}…` : "Reading a file…"
 		case "listFilesTopLevel":
 		case "listFilesRecursive":
-			return tool.path ? `Looking around ${cleanedPath}/…` : null
+			return tool.path ? `Listing files in ${cleanedPath}/…` : "Listing files…"
 		case "searchFiles":
-			return tool.regex && tool.path ? `Searching ${formatSearchRegex(tool.regex, tool.path, tool.filePattern)}…` : null
+			return tool.regex && tool.path
+				? `Searching ${formatSearchRegex(tool.regex, tool.path, tool.filePattern)}…`
+				: tool.path
+					? `Searching files in ${cleanedPath}/…`
+					: "Searching files…"
 		case "listCodeDefinitionNames":
-			return tool.path ? `Checking definitions in ${cleanedPath}/…` : null
+			return tool.path ? `Checking code definitions in ${cleanedPath}/…` : "Checking code definitions…"
 		default:
 			return null
 	}
@@ -96,10 +102,7 @@ const getCurrentActivities = (allMessages: DietCodeMessage[]): DietCodeMessage[]
 	return activities
 }
 
-/**
- * Renders a collapsible group of low-stakes tool calls.
- * Shows both completed tools AND currently active tools in a unified list (only for last group).
- */
+/** Shows the live workspace action trail and collapsible file/search references. */
 export const ToolGroupRenderer = memo(({ messages, allMessages, isLastGroup }: ToolGroupRendererProps) => {
 	const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({})
 	const [detailsExpanded, setDetailsExpanded] = useState(false)
@@ -116,35 +119,16 @@ export const ToolGroupRenderer = memo(({ messages, allMessages, isLastGroup }: T
 	}, [allMessages, isLastGroup])
 
 	// Build completed tool items
-	const completedTools = useMemo(() => buildToolsWithReasoning(filteredMessages), [filteredMessages])
+	const completedTools = useMemo(() => buildCompletedWorkspaceTools(filteredMessages), [filteredMessages])
 
 	// Build active tool items
 	const activeTools = useMemo(() => {
-		return currentActivities
-			.map((msg) => {
-				const parsedTool = parseToolSafe(msg.text)
-				return {
-					tool: msg,
-					parsedTool,
-					reasoning: undefined,
-					isActive: true,
-					activityText: getActivityText(parsedTool),
-				}
-			})
-			.filter((item) => item.activityText)
+		return currentActivities.flatMap((msg): ActiveWorkspaceTool[] => {
+			const parsedTool = parseToolSafe(msg.text)
+			const activityText = getActivityText(parsedTool)
+			return activityText ? [{ tool: msg, parsedTool, activityText }] : []
+		})
 	}, [currentActivities])
-
-	// Merge: completed items first, then active items (active only added to last group)
-	// Deduplicate - exclude completed items that match active items by path
-	const allTools = useMemo(() => {
-		// Get paths of active items
-		const activePaths = new Set(activeTools.map((item) => item.parsedTool.path).filter(Boolean))
-
-		// Filter out completed items that are also being actively read
-		const dedupedCompleted = completedTools.filter((item) => !activePaths.has(item.parsedTool.path))
-
-		return [...dedupedCompleted, ...activeTools]
-	}, [completedTools, activeTools])
 
 	const handleOpenFile = useCallback((filePath: string) => {
 		FileServiceClient.openFileRelativePath(StringRequest.create({ value: filePath })).catch((err) =>
@@ -156,12 +140,62 @@ export const ToolGroupRenderer = memo(({ messages, allMessages, isLastGroup }: T
 		setExpandedItems((prev) => ({ ...prev, [ts]: !prev[ts] }))
 	}, [])
 
-	const hasActive = activeTools.length > 0
 	const showDetails = detailsExpanded
 
-	// Keep active workspace work out of the transcript. Completed references remain
-	// available on demand after the response, without narrating each operation.
-	if (hasActive || allTools.length === 0) {
+	if (activeTools.length > 0) {
+		return (
+			<section aria-label="Workspace activity" className="ml-1 px-4 py-1 text-description/80">
+				<div className="text-[10px] font-medium text-muted-foreground">Workspace activity</div>
+				<ul className="m-0 mt-1 max-h-28 list-none space-y-0.5 overflow-y-auto p-0">
+					{completedTools.map(({ tool, parsedTool }) => {
+						const info = getToolDisplayInfo(parsedTool)
+						if (!info) return null
+
+						const isExpandable = EXPANDABLE_TOOLS.has(parsedTool.tool)
+						const isItemExpanded = expandedItems[tool.ts] ?? false
+						const content = parsedTool.content || null
+						const completedText = info.displayText || cleanPathPrefix(info.path)
+
+						return (
+							<li className="min-w-0" key={tool.ts}>
+								<Button
+									className="flex min-w-0 max-w-full cursor-pointer items-center gap-[3px] px-0 py-[1px] text-left text-[12px] leading-tight text-description hover:text-link"
+									onClick={() => (isExpandable ? handleItemToggle(tool.ts) : handleOpenFile(info.path))}
+									size="icon"
+									variant="text">
+									<Check aria-hidden className="size-3 shrink-0 text-success" />
+									<span className="min-w-0 flex-1 truncate text-left">
+										<span className="sr-only">Completed: </span>
+										{completedText}
+									</span>
+								</Button>
+								{isExpandable && isItemExpanded && content && (
+									<pre className="m-1 ml-4 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xs p-2 text-xs opacity-80">
+										{content}
+									</pre>
+								)}
+							</li>
+						)
+					})}
+					{activeTools.map(({ tool, parsedTool, activityText }) => {
+						const info = getToolDisplayInfo(parsedTool)
+						if (!info) return null
+
+						return (
+							<li
+								className="flex min-w-0 items-start gap-1.5 text-[12px] leading-snug text-description"
+								key={tool.ts}>
+								<info.icon aria-hidden className="mt-0.5 size-3 shrink-0 opacity-70" />
+								<span className="min-w-0 break-words">{activityText}</span>
+							</li>
+						)
+					})}
+				</ul>
+			</section>
+		)
+	}
+
+	if (completedTools.length === 0) {
 		return null
 	}
 
@@ -173,12 +207,12 @@ export const ToolGroupRenderer = memo(({ messages, allMessages, isLastGroup }: T
 				onClick={() => setDetailsExpanded((prev) => !prev)}
 				type="button">
 				<ChevronRight aria-hidden className={cn("size-3 transition-transform", showDetails && "rotate-90")} />
-				<span>Workspace context</span>
+				<span>Files and searches</span>
 			</button>
 
 			{showDetails && (
 				<div className="min-w-0 mt-1 animate-lumi-reveal">
-					{allTools.map(({ tool, parsedTool, isActive, activityText }) => {
+					{completedTools.map(({ tool, parsedTool }) => {
 						const info = getToolDisplayInfo(parsedTool)
 						if (!info) {
 							return null
@@ -188,26 +222,6 @@ export const ToolGroupRenderer = memo(({ messages, allMessages, isLastGroup }: T
 						const isItemExpanded = expandedItems[tool.ts] ?? false
 						const content = parsedTool.content || null
 
-						// Active items render with "Reading..." TypewriterText (match completed item structure exactly)
-						if (isActive && activityText) {
-							return (
-								<div className="min-w-0" key={tool.ts}>
-									{/* ACTIVE "READING..." ITEM STYLING - Modify vertical spacing here via py-0 and -my-0.5 */}
-									<Button
-										className="flex items-center gap-[3px] text-[13px] text-description py-[1px] min-w-0 max-w-full px-0 leading-tight -my-0.5"
-										disabled
-										size="icon"
-										variant="text">
-										<info.icon className="opacity-70 shrink-0 size-[12px]" />
-										<span className="flex-1 min-w-0 whitespace-nowrap overflow-hidden text-ellipsis text-left text-[13px]">
-											<TypewriterText speed={15} text={activityText} />
-										</span>{" "}
-									</Button>
-								</div>
-							)
-						}
-
-						// Completed items render normally (clickable)
 						return (
 							<div className="min-w-0" key={tool.ts}>
 								<Button
@@ -241,12 +255,9 @@ export const ToolGroupRenderer = memo(({ messages, allMessages, isLastGroup }: T
 	)
 })
 
-/**
- * Build tool items WITHOUT reasoning.
- * Reasoning should not be displayed in file lists - only file/folder content.
- */
-function buildToolsWithReasoning(messages: DietCodeMessage[]): ToolWithReasoning[] {
-	const result: ToolWithReasoning[] = []
+/** Build file/search references from completed workspace tools only. */
+function buildCompletedWorkspaceTools(messages: DietCodeMessage[]): WorkspaceToolReference[] {
+	const result: WorkspaceToolReference[] = []
 
 	for (const msg of messages) {
 		// Skip reasoning messages - they should not be in file lists
@@ -254,13 +265,9 @@ function buildToolsWithReasoning(messages: DietCodeMessage[]): ToolWithReasoning
 			continue
 		}
 
-		if (isLowStakesTool(msg)) {
+		if (msg.say === "tool" && isLowStakesTool(msg)) {
 			const parsedTool = parseToolSafe(msg.text)
-			result.push({
-				tool: msg,
-				parsedTool,
-				reasoning: undefined, // Never show reasoning in file lists
-			})
+			result.push({ tool: msg, parsedTool })
 		}
 	}
 

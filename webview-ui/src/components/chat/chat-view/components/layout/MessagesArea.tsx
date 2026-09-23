@@ -82,7 +82,6 @@ export const MessagesArea = memo<MessagesAreaProps>(
 					<InitialTaskPrompt
 						key={task.ts}
 						onSendMessage={messageHandlers.handleSendMessage}
-						showPreparingStatus={groupedMessages.length === 0}
 						task={task}
 					/>
 				),

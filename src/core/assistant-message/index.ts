@@ -52,6 +52,7 @@ export const toolParamNames = [
 	"from_ref",
 	"to_ref",
 	"skill_name",
+	"resource_path",
 	"prompt_1",
 	"prompt_2",
 	"prompt_3",

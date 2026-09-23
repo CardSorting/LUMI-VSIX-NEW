@@ -1464,9 +1464,12 @@ export class ExecutionFunnel {
 		// Autonomous mode removes per-operation consent prompts. Operation policy,
 		// hooks, workspace/lane authority, and lifecycle checks still run before dispatch.
 		const automaticApprovalAllowed = automaticApprovalConsidered && (autonomousMode || configuredAutomaticApprovalAllowed)
+		const settingsVersion =
+			settings && Number.isInteger(settings.version) && (settings.version as number) >= 1
+				? (settings.version as number)
+				: 0
 		return {
-			settingsVersion:
-				Number.isInteger(settings?.version) && (settings.version as number) >= 1 ? (settings.version as number) : 0,
+			settingsVersion,
 			actions,
 			trustedCommandMatched,
 			commandSafetyTiers,

@@ -11,6 +11,7 @@ import { BooleanRequest, type String as ProtoString, StringRequest } from "@shar
 import type { ShowWebviewEvent } from "@shared/proto/dietcode/ui"
 import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { useMount } from "react-use"
+import { AgentActivityStatus } from "@/components/chat/AgentActivityStatus"
 import { isChatInputEnabled } from "@/components/chat/chat-view/shared/chatInputPolicy"
 import { InitialTaskPrompt } from "@/components/chat/InitialTaskPrompt"
 import { normalizeApiConfiguration } from "@/components/settings/utils/providerUtils"
@@ -79,6 +80,7 @@ const ActiveChatView = memo<ActiveChatViewProps>(
 		} = useExtensionState()
 		//const task = messages.length > 0 ? (messages[0].say === "task" ? messages[0] : undefined) : undefined) : undefined
 		const task = useMemo(() => messages.at(0), [messages]) // leaving this less safe version here since if the first message is not a task, then the extension is in a bad state and needs to be debugged (see LUMI.abort)
+		// Activity reads the live raw stream directly; the transcript below is intentionally deferred.
 		const modifiedMessages = useMemo(() => {
 			const slicedMessages = renderMessages.slice(1)
 			// Only combine hook sequences if hooks are enabled
@@ -317,26 +319,28 @@ const ActiveChatView = memo<ActiveChatViewProps>(
 						</Suspense>
 					) : task ? (
 						<div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-							<Suspense
-								fallback={
-									<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-										<InitialTaskPrompt
-											key={task.ts}
-											onSendMessage={messageHandlers.handleSendMessage}
-											showPreparingStatus={visibleMessages.length === 0}
-											task={task}
-										/>
-									</div>
-								}>
-								<MessagesArea
-									chatState={renderChatState}
-									groupedMessages={groupedMessages}
-									messageHandlers={renderMessageHandlers}
-									modifiedMessages={modifiedMessages}
-									scrollBehavior={scrollBehavior}
-									task={task}
-								/>
-							</Suspense>
+							<div className="min-h-0 flex-1">
+								<Suspense
+									fallback={
+										<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+											<InitialTaskPrompt
+												key={task.ts}
+												onSendMessage={messageHandlers.handleSendMessage}
+												task={task}
+											/>
+										</div>
+									}>
+									<MessagesArea
+										chatState={renderChatState}
+										groupedMessages={groupedMessages}
+										messageHandlers={renderMessageHandlers}
+										modifiedMessages={modifiedMessages}
+										scrollBehavior={scrollBehavior}
+										task={task}
+									/>
+								</Suspense>
+							</div>
+							<AgentActivityStatus messages={messages} />
 						</div>
 					) : !isNewUser ? (
 						<Suspense fallback={<div aria-hidden className="flex min-h-0 flex-1" />}>
