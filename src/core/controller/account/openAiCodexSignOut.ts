@@ -8,11 +8,11 @@ import { Logger } from "@/shared/services/Logger"
  */
 export async function openAiCodexSignOut(controller: Controller, _: EmptyRequest): Promise<Empty> {
 	try {
-		// Clear stored credentials
-		await openAiCodexOAuthManager.clearCredentials()
-
 		// Cancel any pending authorization flow
 		openAiCodexOAuthManager.cancelAuthorizationFlow()
+
+		// Persist the signed-out state so mirrored credentials cannot silently reconnect.
+		await openAiCodexOAuthManager.clearCredentials()
 
 		// Update the state to reflect sign out
 		await controller.postStateToWebview()

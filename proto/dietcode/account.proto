@@ -56,6 +56,9 @@ service AccountService {
   // Signs out of OpenAI Codex and clears stored credentials
   rpc openAiCodexSignOut(EmptyRequest) returns (Empty);
 
+  // Cancels an in-progress OpenAI Codex sign-in attempt
+  rpc openAiCodexCancelSignIn(EmptyRequest) returns (Empty);
+
   // xAI Grok OAuth device-code authentication for SuperGrok / Premium+ subscriptions
   rpc xaiOauthSignIn(EmptyRequest) returns (Empty);
 

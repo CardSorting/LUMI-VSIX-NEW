@@ -989,6 +989,10 @@ export class Controller implements IController {
 
 		const { openAiCodexOAuthManager } = await import("@/integrations/openai-codex/oauth")
 		const openAiCodexIsAuthenticated = await openAiCodexOAuthManager.isAuthenticated()
+		const openAiCodexAccountEmail = openAiCodexIsAuthenticated
+			? (await openAiCodexOAuthManager.getEmail()) || undefined
+			: undefined
+		const openAiCodexAuthError = openAiCodexOAuthManager.getAuthorizationError() || undefined
 		const { xaiOAuthManager } = await import("@/integrations/xai-oauth/oauth")
 		const xaiOAuthIsAuthenticated = await xaiOAuthManager.isAuthenticated()
 		const googleAuthIsAuthenticated = !!(await this.authService.getAuthToken("google"))
@@ -1091,6 +1095,8 @@ export class Controller implements IController {
 			banners,
 			welcomeBanners,
 			openAiCodexIsAuthenticated,
+			openAiCodexAccountEmail,
+			openAiCodexAuthError,
 			xaiOAuthIsAuthenticated,
 			googleAuthIsAuthenticated,
 			googleUserInfo: (await this.authService.getProviderUserInfo("google")) || undefined,

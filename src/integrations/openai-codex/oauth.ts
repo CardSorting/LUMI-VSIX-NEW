@@ -18,7 +18,7 @@ import { Logger } from "@/shared/services/Logger"
  * - ISSUER: https://auth.openai.com
  * - Authorization endpoint: https://auth.openai.com/oauth/authorize
  * - Token endpoint: https://auth.openai.com/oauth/token
- * - Fixed callback port: 1455
+ * - Preferred callback port: 1455, with Codex's supported fallback port 1457
  * - Codex-specific params: codex_cli_simplified_flow=true, originator=dietcode
  */
 export const OPENAI_CODEX_OAUTH_CONFIG = {
@@ -28,11 +28,13 @@ export const OPENAI_CODEX_OAUTH_CONFIG = {
 	redirectUri: "http://localhost:1455/auth/callback",
 	scopes: "openid profile email offline_access",
 	callbackPort: 1455,
+	fallbackCallbackPort: 1457,
 	callbackHost: "127.0.0.1",
 } as const
 
 // Token storage key - must match the key in SECRETS_KEYS (state-keys.ts)
 const _OPENAI_CODEX_CREDENTIALS_KEY = "openai-codex-oauth-credentials"
+const OPENAI_CODEX_SIGNED_OUT_KEY = "openai-codex-oauth-signed-out"
 
 // Credentials schema
 const openAiCodexCredentialsSchema = z.object({
@@ -323,10 +325,15 @@ export function generateState(): string {
  * Builds the authorization URL for OpenAI Codex OAuth flow
  * Includes Codex-specific parameters per the implementation guide
  */
-export function buildAuthorizationUrl(codeChallenge: string, state: string, originatorOverride?: string): string {
+export function buildAuthorizationUrl(
+	codeChallenge: string,
+	state: string,
+	originatorOverride?: string,
+	redirectUri: string = OPENAI_CODEX_OAUTH_CONFIG.redirectUri,
+): string {
 	const params = new URLSearchParams({
 		client_id: OPENAI_CODEX_OAUTH_CONFIG.clientId,
-		redirect_uri: OPENAI_CODEX_OAUTH_CONFIG.redirectUri,
+		redirect_uri: redirectUri,
 		scope: OPENAI_CODEX_OAUTH_CONFIG.scopes,
 		code_challenge: codeChallenge,
 		code_challenge_method: "S256",
@@ -346,12 +353,16 @@ export function buildAuthorizationUrl(codeChallenge: string, state: string, orig
  * Important: Uses application/x-www-form-urlencoded (not JSON)
  * Important: state must NOT be included in token exchange body
  */
-export async function exchangeCodeForTokens(code: string, codeVerifier: string): Promise<OpenAiCodexCredentials> {
+export async function exchangeCodeForTokens(
+	code: string,
+	codeVerifier: string,
+	redirectUri: string = OPENAI_CODEX_OAUTH_CONFIG.redirectUri,
+): Promise<OpenAiCodexCredentials> {
 	const body = new URLSearchParams({
 		grant_type: "authorization_code",
 		client_id: OPENAI_CODEX_OAUTH_CONFIG.clientId,
 		code,
-		redirect_uri: OPENAI_CODEX_OAUTH_CONFIG.redirectUri,
+		redirect_uri: redirectUri,
 		code_verifier: codeVerifier,
 	})
 
@@ -394,6 +405,24 @@ export async function exchangeCodeForTokens(code: string, codeVerifier: string):
 		accountId,
 		id_token: tokenResponse.id_token || tokenResponse.access_token,
 	}
+}
+
+function respondToCodexCallback(response: http.ServerResponse, title: string, message: string, statusCode = 200): void {
+	const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }
+	const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => entities[character] ?? character)
+	response.writeHead(statusCode, {
+		"Content-Type": "text/html; charset=utf-8",
+		"Cache-Control": "no-store",
+		"Referrer-Policy": "no-referrer",
+		"X-Content-Type-Options": "nosniff",
+		"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+	})
+	response.end(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)}</title><style>
+:root{color-scheme:light dark;font:16px system-ui,sans-serif}body{margin:0;min-height:100vh;display:grid;place-items:center;background:Canvas;color:CanvasText}
+main{width:min(28rem,calc(100% - 3rem));line-height:1.5}h1{font-size:1.35rem;margin:0 0 .5rem}p{margin:0;color:GrayText}
+</style></head><body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></main></body></html>`)
 }
 
 /**
@@ -470,10 +499,16 @@ export class OpenAiCodexOAuthManager {
 	private lastSyncResult: GalxSyncResult | null = null
 	private sessionCache = new Map<string, OpenAiCodexCredentials & { savedAt: number }>()
 	private cloudSyncLedger = new Map<string, CloudSyncLedgerRecord>()
+	private authorizationError: string | null = null
 	private pendingAuth: {
 		codeVerifier: string
 		state: string
 		server?: http.Server
+		serverReady?: Promise<void>
+		processing?: boolean
+		cancel?: (error: Error) => void
+		redirectUri?: string
+		authorizationUrl?: string
 	} | null = null
 
 	/**
@@ -517,6 +552,11 @@ export class OpenAiCodexOAuthManager {
 		try {
 			try {
 				const stateManager = StateManager.get()
+				if (stateManager.getSecretKey(OPENAI_CODEX_SIGNED_OUT_KEY) === "true") {
+					this.credentials = null
+					this.sessionCache.delete("active_lease")
+					return null
+				}
 				const credentialsJson = stateManager.getSecretKey("openai-codex-oauth-credentials")
 
 				if (credentialsJson) {
@@ -565,6 +605,7 @@ export class OpenAiCodexOAuthManager {
 	 * Save credentials to StateManager, in-memory session cache, and synchronize to disk.
 	 */
 	async saveCredentials(credentials: OpenAiCodexCredentials, syncToDisk = true, triggerAsyncCloudSync = true): Promise<void> {
+		this.authorizationError = null
 		this.credentials = credentials
 		this.sessionCache.set("active_lease", {
 			...credentials,
@@ -573,6 +614,7 @@ export class OpenAiCodexOAuthManager {
 
 		try {
 			const stateManager = StateManager.get()
+			stateManager.setSecret(OPENAI_CODEX_SIGNED_OUT_KEY, undefined)
 			stateManager.setSecret("openai-codex-oauth-credentials", JSON.stringify(credentials))
 			await stateManager.flushPendingState()
 		} catch {
@@ -595,6 +637,7 @@ export class OpenAiCodexOAuthManager {
 		try {
 			const stateManager = StateManager.get()
 			stateManager.setSecret("openai-codex-oauth-credentials", undefined)
+			stateManager.setSecret(OPENAI_CODEX_SIGNED_OUT_KEY, "true")
 			await stateManager.flushPendingState()
 		} catch {
 			// StateManager optional fallback
@@ -1176,21 +1219,25 @@ export class OpenAiCodexOAuthManager {
 
 	/**
 	 * Start the OAuth authorization flow
-	 * Returns the authorization URL to open in browser
+	 * Creates the state and PKCE verifier; the URL is available after the listener binds.
 	 */
-	startAuthorizationFlow(originatorOverride?: string): string {
+	startAuthorizationFlow(): void {
 		this.cancelAuthorizationFlow()
+		this.authorizationError = null
 
 		const codeVerifier = generateCodeVerifier()
-		const codeChallenge = generateCodeChallenge(codeVerifier)
 		const state = generateState()
 
 		this.pendingAuth = {
 			codeVerifier,
 			state,
 		}
+	}
 
-		return buildAuthorizationUrl(codeChallenge, state, originatorOverride)
+	getAuthorizationUrl(): string {
+		const authorizationUrl = this.pendingAuth?.authorizationUrl
+		if (!authorizationUrl) throw new Error("The OAuth callback listener is not ready")
+		return authorizationUrl
 	}
 
 	/**
@@ -1201,6 +1248,7 @@ export class OpenAiCodexOAuthManager {
 		if (!this.pendingAuth) {
 			throw new Error("No pending authorization flow")
 		}
+		const authFlow = this.pendingAuth
 
 		if (this.pendingAuth.server) {
 			try {
@@ -1212,154 +1260,182 @@ export class OpenAiCodexOAuthManager {
 		}
 
 		return new Promise((resolve, reject) => {
-			const server = http.createServer(async (req, res) => {
+			let resolveServerReady!: () => void
+			let rejectServerReady!: (error: Error) => void
+			authFlow.serverReady = new Promise<void>((ready, failed) => {
+				resolveServerReady = ready
+				rejectServerReady = failed
+			})
+			let server: http.Server | undefined
+			const callbackHandler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
 				try {
 					const url = new URL(req.url || "", `http://localhost:${OPENAI_CODEX_OAUTH_CONFIG.callbackPort}`)
 
-					if (url.pathname !== "/auth/callback") {
+					if (req.method !== "GET" || url.pathname !== "/auth/callback") {
 						res.writeHead(404)
 						res.end("Not Found")
 						return
 					}
 
-					const code = url.searchParams.get("code")
 					const state = url.searchParams.get("state")
 					const error = url.searchParams.get("error")
 
+					// A forged localhost request must not be able to cancel a user's active login.
+					if (!state || state !== authFlow.state || this.pendingAuth !== authFlow) {
+						res.writeHead(400)
+						res.end("Invalid authorization response")
+						return
+					}
+
 					if (error) {
-						res.writeHead(400)
-						res.end(`Authentication failed: ${error}`)
-						reject(new Error(`OAuth error: ${error}`))
-						server.close()
+						respondToCodexCallback(res, "Sign-in wasn't completed", "Return to LUMI to try again.", 400)
+						const safeErrorCode = error.slice(0, 80).replace(/[^a-zA-Z0-9_-]/g, "") || "unknown"
+						reject(new Error(`OAuth error: ${safeErrorCode}`))
+						server?.close()
 						return
 					}
 
-					if (!code || !state) {
-						res.writeHead(400)
-						res.end("Missing code or state parameter")
-						reject(new Error("Missing code or state parameter"))
-						server.close()
+					const code = url.searchParams.get("code")
+					if (!code) {
+						respondToCodexCallback(
+							res,
+							"Sign-in response incomplete",
+							"Return to LUMI and try connecting again.",
+							400,
+						)
+						reject(new Error("Authorization callback did not include a code"))
+						server?.close()
 						return
 					}
 
-					if (state !== this.pendingAuth?.state) {
-						res.writeHead(400)
-						res.end("State mismatch - possible CSRF attack")
-						reject(new Error("State mismatch"))
-						server.close()
+					if (authFlow.processing) {
+						res.writeHead(409)
+						res.end("This authorization response is already being processed.")
 						return
 					}
+					authFlow.processing = true
 
 					try {
-						const credentials = await exchangeCodeForTokens(code, this.pendingAuth.codeVerifier)
+						const credentials = await exchangeCodeForTokens(code, authFlow.codeVerifier, authFlow.redirectUri)
+						if (this.pendingAuth !== authFlow) {
+							throw new Error("Authentication cancelled")
+						}
 
 						await this.saveCredentials(credentials, true, false)
-						// Direct synchronous sync to cloud backend
-						await this.syncToGalx().catch(() => ({ success: false }))
-
-						res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
-						res.end(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Authentication Successful</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    color: #fff;
-  }
-  .container { text-align: center; padding: 48px; max-width: 420px; }
-  .icon {
-    width: 72px; height: 72px; margin: 0 auto 24px;
-    background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .icon svg { width: 36px; height: 36px; stroke: #fff; stroke-width: 3; fill: none; }
-  h1 { font-size: 24px; font-weight: 600; margin-bottom: 12px; }
-  p { font-size: 15px; color: rgba(255,255,255,0.7); line-height: 1.5; }
-  .closing { margin-top: 32px; font-size: 13px; color: rgba(255,255,255,0.5); }
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="icon">
-    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-  </div>
-  <h1>Authentication Successful</h1>
-  <p>You're now signed in to OpenAI Codex. You can close this window and return to your IDE.</p>
-  <p class="closing">This window will close automatically...</p>
-</div>
-<script>setTimeout(() => window.close(), 3000);</script>
-</body>
-</html>`)
+						respondToCodexCallback(
+							res,
+							"Connected to LUMI",
+							"You can return to LUMI to continue. You may close this tab.",
+						)
 
 						this.pendingAuth = null
-						server.close()
+						server?.close()
 						resolve(credentials)
+						// Keep the browser handoff fast; cloud synchronization is secondary.
+						void this.syncToGalx().catch((syncError) => {
+							Logger.warn("[openai-codex-oauth] Background account sync failed:", syncError)
+						})
 					} catch (exchangeError) {
-						res.writeHead(500)
-						res.end(`Token exchange failed: ${exchangeError}`)
+						respondToCodexCallback(res, "Sign-in couldn't finish", "Return to LUMI and try connecting again.", 500)
 						reject(exchangeError)
-						server.close()
+						server?.close()
 					}
 				} catch (err) {
 					res.writeHead(500)
 					res.end("Internal server error")
 					reject(err)
-					server.close()
+					server?.close()
 				}
-			})
-
-			server.on("error", (err: NodeJS.ErrnoException) => {
-				this.pendingAuth = null
-				if (err.code === "EADDRINUSE") {
-					reject(
-						new Error(
-							`Port ${OPENAI_CODEX_OAUTH_CONFIG.callbackPort} is already in use. ` +
-								`Please close any other applications using this port and try again.`,
-						),
-					)
-				} else {
-					reject(err)
-				}
-			})
+			}
 
 			const timeout = setTimeout(
 				() => {
-					server.close()
+					server?.close()
+					if (this.pendingAuth === authFlow) this.pendingAuth = null
 					reject(new Error("Authentication timed out"))
 				},
 				5 * 60 * 1000,
 			)
-
-			server.listen(OPENAI_CODEX_OAUTH_CONFIG.callbackPort, () => {
-				if (this.pendingAuth) {
-					this.pendingAuth.server = server
-				}
-			})
-
-			server.on("close", () => {
+			authFlow.cancel = (error) => {
 				clearTimeout(timeout)
-			})
+				rejectServerReady(error)
+				try {
+					server?.close()
+				} catch {
+					// The listener may not have bound yet.
+				}
+				reject(error)
+			}
+
+			const callbackPorts = [OPENAI_CODEX_OAUTH_CONFIG.callbackPort, OPENAI_CODEX_OAUTH_CONFIG.fallbackCallbackPort]
+			let portAttempt = 0
+			const listenForCallback = () => {
+				const port = callbackPorts[portAttempt]
+				const callbackServer = http.createServer(callbackHandler)
+				server = callbackServer
+				callbackServer.on("error", (err: NodeJS.ErrnoException) => {
+					if (err.code === "EADDRINUSE" && portAttempt + 1 < callbackPorts.length) {
+						portAttempt += 1
+						listenForCallback()
+						return
+					}
+					if (this.pendingAuth === authFlow) this.pendingAuth = null
+					clearTimeout(timeout)
+					const error =
+						err.code === "EADDRINUSE"
+							? new Error(
+									`Codex sign-in ports ${callbackPorts.join(" and ")} are already in use. ` +
+										"Close another Codex sign-in window and try again.",
+								)
+							: err
+					rejectServerReady(error)
+					reject(error)
+				})
+				callbackServer.listen(port, OPENAI_CODEX_OAUTH_CONFIG.callbackHost, () => {
+					if (this.pendingAuth !== authFlow) {
+						callbackServer.close()
+						return
+					}
+					const redirectUri = `http://localhost:${port}/auth/callback`
+					authFlow.server = callbackServer
+					authFlow.redirectUri = redirectUri
+					authFlow.authorizationUrl = buildAuthorizationUrl(
+						generateCodeChallenge(authFlow.codeVerifier),
+						authFlow.state,
+						undefined,
+						redirectUri,
+					)
+					callbackServer.on("close", () => clearTimeout(timeout))
+					resolveServerReady()
+				})
+			}
+			listenForCallback()
 		})
+	}
+
+	/** Resolves once the loopback listener is accepting the OAuth redirect. */
+	waitForCallbackReady(): Promise<void> {
+		const ready = this.pendingAuth?.serverReady
+		return ready ?? Promise.reject(new Error("No pending authorization callback listener"))
 	}
 
 	/**
 	 * Cancel any pending authorization flow
 	 */
 	cancelAuthorizationFlow(): void {
-		if (this.pendingAuth?.server) {
-			this.pendingAuth.server.close()
-		}
+		const pendingAuth = this.pendingAuth
 		this.pendingAuth = null
+		this.authorizationError = null
+		pendingAuth?.cancel?.(new Error("Authentication cancelled"))
+		pendingAuth?.server?.close()
+	}
+
+	setAuthorizationError(message: string): void {
+		this.authorizationError = message
+	}
+
+	getAuthorizationError(): string | null {
+		return this.authorizationError
 	}
 
 	/**
