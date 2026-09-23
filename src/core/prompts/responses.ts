@@ -74,10 +74,10 @@ export const formatResponse = {
 	},
 
 	dietcodeIgnoreError: (path: string) =>
-		`Access to ${path} is blocked by the .dietcodeignore file settings. You must try to continue in the task without using this file, or ask the user to update the .dietcodeignore file.`,
+		`Access to ${path} is blocked by .dietcodeignore. Continue with an allowed alternative and do not ask to weaken the ignore rules. If no in-scope path remains, report the blocker and the smallest change that would unblock the task.`,
 
 	permissionDeniedError: (reason: string) =>
-		`Command execution blocked by CLINE_COMMAND_PERMISSIONS: ${reason}. You must try a different approach or ask the user to update the permission settings.`,
+		`Command execution blocked by CLINE_COMMAND_PERMISSIONS: ${reason}. Continue with an allowed alternative and do not ask to weaken command permissions. If no in-scope path remains, report the blocker and the smallest change that would unblock the task.`,
 
 	noToolsUsed: (usingNativeToolCalls: boolean) =>
 		`[ERROR] You did not use a tool in your previous response! Please retry with a tool use.
@@ -338,10 +338,10 @@ Once you have a detailed architectural plan, use the plan_mode_respond tool to p
 		`This is likely because the SEARCH block content doesn't match exactly with what's in the file, or if you used multiple SEARCH/REPLACE blocks they may not have been in the order they appear in the file. (Please also ensure that when using the replace_in_file tool, Do NOT add extra characters to the markers (e.g., ------- SEARCH> is INVALID). Do NOT forget to use the closing +++++++ REPLACE marker. Do NOT modify the marker format in any way. Malformed XML will cause complete tool failure and break the entire editing process.)\n\n` +
 		`The file was reverted to its original state:\n\n` +
 		`<file_content path="${relPath.toPosix()}">\n${originalContent}\n</file_content>\n\n` +
-		`Now that you have the latest state of the file, try the operation again with fewer, more precise SEARCH blocks. For large files especially, it may be prudent to try to limit yourself to <5 SEARCH/REPLACE blocks at a time, then wait for the user to respond with the result of the operation before following up with another replace_in_file call to make additional edits.\n(If you run into this error 3 times in a row, you may use the write_to_file tool as a fallback.)`,
+		`The file has been restored. Retry immediately with a smaller, more precise SEARCH/REPLACE block; for large files, split edits into focused batches and continue from each returned result without waiting for the user. If the same mismatch occurs three times, switch to write_to_file using the latest complete file content.`,
 
 	toolAlreadyUsed: (toolName: string) =>
-		`Tool [${toolName}] was not executed because a tool has already been used in this message. Only one tool may be used per message. You must assess the first tool's result before proceeding to use the next tool.`,
+		`Tool [${toolName}] was not executed because this turn accepts one tool call at a time. Continue with the next tool call using the result already returned; do not repeat completed work or wait for the user to relay the result.`,
 
 	dietcodeIgnoreInstructions: (content: string) =>
 		`# .dietcodeignore\n\n(The following is provided by a root-level .dietcodeignore file where the user has specified files and directories that should not be accessed. When using list_files, you'll notice a ${LOCK_TEXT_SYMBOL} next to files that are blocked. Attempting to access the file's contents e.g. through read_file will result in an error.)\n\n${content}\n.dietcodeignore`,

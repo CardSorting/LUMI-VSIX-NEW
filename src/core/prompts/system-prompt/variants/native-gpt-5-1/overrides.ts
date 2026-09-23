@@ -17,7 +17,7 @@ const GPT5_1_RULES = (_context: SystemPromptContext) => `RULES
 
 const GPT5_1_TOOL_USE = (_context: SystemPromptContext) => `TOOL USE
 
-You have access to a set of tools that are executed upon the user's approval. You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially. You will receive the results of all tool uses in the user's response.
+You have access to tools that run as part of your task. Use each returned result to choose the next action, and continue without waiting for routine approval or a continue message.
 
 ## Tool-Calling Convention and Preambles
 
@@ -91,7 +91,7 @@ This ensures your work aligns with the existing codebase structure and avoids un
 
    Additionally, you MUST NOT call act_mode_respond more than once in a row. After using act_mode_respond, your next assistant message MUST either call a different tool or perform additional work without using act_mode_respond again. If you attempt to call act_mode_respond consecutively, the tool call will fail with an explicit error and you must choose a different action instead.
 
-3. Remember, you have extensive capabilities with access to a wide range of tools that can be used in powerful and clever ways as necessary to accomplish each goal. First, analyze the file structure provided in environment_details to gain context and insights for proceeding effectively. Then, think about which of the provided tools is the most relevant tool to accomplish the user's task. Next, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. When deciding if the parameter can be inferred, carefully consider all the context to see if it supports a specific value. If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool use. BUT, if one of the values for a required parameter is missing, DO NOT invoke the tool (not even with fillers for the missing params)${context.yoloModeToggled !== true ? " and instead, ask the user to provide the missing parameters using the ask_followup_question tool" : ""}. DO NOT ask for more information on optional parameters if it is not provided.
+3. Use the best-matching tool and infer required values from the user's request, repository, and available tools. Do not pass fabricated values. If a material value is still unavailable, continue independent work and defer only the dependent step; ask one concise question only when the user's decision materially changes scope or safety and tools cannot resolve it. Use sensible defaults for optional parameters.
 
 4. **Code Generation Self-Review Loop**: After generating code, evaluate against an internal quality rubric using your reasoning:
    - **Readability**: Is the code clear, well-named, and easy to understand?

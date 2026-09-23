@@ -290,7 +290,7 @@ Full architecture: [governed-subagent-execution.md](governed-subagent-execution.
 - Give every attempt a fresh runner, model client, prompt context, and timeout; abort and wait for quiescence before replacement.
 - Give each attempt one lane-local task state and tool coordinator; completion gates never mutate parent or sibling state.
 - Count tokens and cost across all attempts, and stop pending/running work when the aggregate parent budget is crossed.
-- Record explicit launch consent for the declared subagent batch, then route every child operation through the identical `ExecutionFunnel` authority. Child read/edit settings apply to that child's pure intent; no launch decision or permit is inherited or reused by another invocation.
+- Record one autonomous or explicit launch decision for the declared subagent batch, then route every child operation through the identical `ExecutionFunnel` authority. Each child gets its own decision: autonomous mode proceeds without per-operation consent prompts, while mode-off uses child read/edit settings. No launch decision or permit is inherited or reused.
 - Propagate failed dependencies immediately, diagnose true deadlocks with dependency states, and release the orchestration lease in a final cleanup barrier.
 - Keep peer spawning and shared-ledger synthesis at the parent; workers return structured review/documentation requests unless explicitly assigned ownership.
 
@@ -301,7 +301,7 @@ Full architecture: [governed-subagent-execution.md](governed-subagent-execution.
 - Permanent task failures free a worker slot immediately; retries do not amplify deterministic faults.
 - A throttled lane waiting on jitter does not reduce active capacity for untouched lanes.
 - Slow trace registration never gates execution; advisory preflight and unavailable progress UI have bounded waits.
-- Approval remains explicit at the authority boundary without adding per-tool latency inside an authorized lane.
+- Each launch and child operation retains one auditable funnel decision; autonomous mode avoids a second launch prompt for in-scope delegated work while preserving child-level policy checks.
 - Cancellation and retry are isolated per lane, without a shared-client abort blast radius.
 - Parent receipts include retry spend and cannot report budget-crossing work as successful.
 - Dependency-heavy swarms reduce makespan without raising the concurrency ceiling.

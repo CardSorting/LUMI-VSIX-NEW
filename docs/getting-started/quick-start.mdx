@@ -4,7 +4,7 @@ sidebarTitle: "Quick Start"
 description: "Get LUMI running in under 2 minutes."
 ---
 
-LUMI is an AI coding assistant inside VS Code. You describe work in plain language; LUMI plans, proposes file edits and commands, and waits for your approval before changing anything.
+LUMI is an AI coding assistant inside VS Code. Describe the result you want; LUMI plans and completes routine, in-scope workspace work autonomously. It asks for consent only when an operation is marked as protected by the execution policy.
 
 <Info>
   **What you'll need:**
@@ -59,7 +59,7 @@ Open a project folder, focus the LUMI chat input (`Cmd+'` / `Ctrl+'` when nothin
 Create a Python function that checks if a string is a palindrome. Include tests.
 ```
 
-LUMI will propose a plan, create files, and ask you to **Approve** each write or command.
+LUMI will inspect the project, create the requested files, and run the requested tests without stopping for approval on each eligible tool call. Protected actions still show an approval prompt.
 
 ## 4. Useful shortcuts
 

@@ -18,6 +18,8 @@ export const SUBAGENT_DEFAULT_ALLOWED_TOOLS: DietCodeDefaultTool[] = [
 	DietCodeDefaultTool.LIST_FILES,
 	DietCodeDefaultTool.SEARCH,
 	DietCodeDefaultTool.LIST_CODE_DEF,
+	DietCodeDefaultTool.PROJECT_MAP,
+	DietCodeDefaultTool.STABILITY_QUERY,
 	DietCodeDefaultTool.BASH,
 	DietCodeDefaultTool.ATTEMPT,
 	DietCodeDefaultTool.MEM_REFRESH,
@@ -30,6 +32,9 @@ export const SUBAGENT_NON_MUTATING_ALLOWED_TOOLS = new Set<DietCodeDefaultTool>(
 	DietCodeDefaultTool.LIST_FILES,
 	DietCodeDefaultTool.SEARCH,
 	DietCodeDefaultTool.LIST_CODE_DEF,
+	DietCodeDefaultTool.PROJECT_MAP,
+	DietCodeDefaultTool.STABILITY_QUERY,
+	DietCodeDefaultTool.USE_SKILL,
 	DietCodeDefaultTool.STABILITY_DIAGNOSE,
 	DietCodeDefaultTool.ATTEMPT,
 ])
@@ -38,18 +43,13 @@ export function constrainSubagentToolsForLane(tools: DietCodeDefaultTool[], muta
 	return mutatingAuthority ? tools : tools.filter((tool) => SUBAGENT_NON_MUTATING_ALLOWED_TOOLS.has(tool))
 }
 
-// Peer-Review & Consensus loops
 const CONSENSUS_PROTO = `
-### SWARM CONSENSUS PROTOCOL
-You cannot spawn peer agents from a worker lane. If critical work needs independent review:
-1. Complete the assigned work and its local verification without waiting on another lane.
-2. Include 'SIGNAL: REVIEW_REQUESTED' with the exact review scope in your final report.
-3. The parent orchestrator decides whether to schedule a verifier and owns cross-lane consensus.
-4. Include 'SIGNAL: CONSENSUS_REACHED' only when the parent supplied actual peer-review evidence.
+### REVIEW HANDOFF
+Worker lanes do not spawn nested workers. Finish assigned work and local checks first. If independent review is material, signal its exact scope to the parent; do not wait for review before completing other work. Report consensus only when peer-review evidence is provided.
 `
 
 const AUTONOMOUS_NUDGE_PROTO = `
-AUTONOMOUS NUDGE: If you sense "Context Uncertainty" (ambiguous requirements or inability to ground your task), invoke the 'mem_refresh' tool or explicitly request a "Grounded Specification Refresh" from the parent in your result.
+AUTONOMOUS NUDGE: Resolve uncertainty with the tools and skills available in your lane. For routine details, make the least disruptive in-scope assumption and continue. Report a blocker only when a missing external decision materially changes scope or safety; complete all independent work first.
 `
 
 const STRUCTURED_SIGNALING_PROTO = `
@@ -57,37 +57,17 @@ STRUCTURED SIGNALING: When signaling critical findings or final results, use str
 CONFIDENCE PRESERVATION: For the principal finding, report [confidence: high|medium|low|unknown], [confidence_reason: direct_evidence|indirect_evidence|underspecified_goal|conflicting_evidence|missing_context|exploratory_hypothesis|model_uncertainty|other], and [criticality: critical|important|advisory]. Low or unknown confidence is a valid exploratory result; do not inflate it to pass a gate. State material assumptions as "Assumption: ...".
 `
 
-const FORENSIC_AXIOMS = `
-### FORENSIC HARDENING AXIOMS
-1. DOCUMENTATION IS CODE: Return ledger-ready documentation evidence for every technical change. Write to the shared Knowledge Ledger (.wiki/) only when this lane explicitly owns documentation and has mutation/write-set authority; the parent owns final cross-lane synthesis.
-2. THE OMNI-BRIDGE RULE: Documentation MUST guarantee maximum success for humans and agents by explicitly defining constraints, schemas, and implementation patterns.
-3. HIERARCHICAL TAXONOMY: Documentation-owner lanes MUST organize the wiki into strict subdirectories (\`onboarding/\`, \`architecture/\`, \`agent/\`). Do NOT dump files in the root.
-4. DECISIONS & RISK MAPPING: You MUST document the "Why" (ADRs) behind architectural choices and map the blast radius/risk of fragile systems.
-5. ENVIRONMENTAL PARITY: Always provide self-verification commands to ensure a contributor's environment is fully configured.
-6. VISUAL CLARITY: Use Mermaid diagrams (\`mermaid\` blocks) to visualize complex structural relationships or state logic.
-7. ENVIRONMENTAL REALITY: Document what the workspace IS (structure, tech stack, gravity centers), not just what changed in git.
-8. PHYSICAL VERIFICATION RULE: You MUST cite the relative paths of ALL modified files in your documentation.
-9. METABOLIC CITATIONS GAUGE: Documentation depth MUST be proportional to the file's churn. Complex changes REQUIRE granular logic/structural records.
-10. ZERO HALLUCINATION: Citations must be grounded in actual file reads and Spider Engine diagnostics.
-11. ANTI-STALL: Avoid reading massive git logs. Use structural tools for context.
-12. STRUCTURAL SYNC: Verify that all internal wiki links are valid and that index.md is current.
+const DELIVERY_PROTO = `
+### DELIVERY
+Stay within assigned scope, lane permissions, write set, locks, hooks, and tool policy. Use relevant skills and available tools; do not create extra wiki entries, ADRs, diagrams, environment audits, or other deliverables unless the task requests or materially needs them. Return a concise result with evidence, affected paths, verification performed and outcome, and material assumptions or unresolved external decisions. Optional documentation and advisory findings do not block completion.
 `
 
 export const SUBAGENT_SYSTEM_SUFFIX = `
 ${AUTONOMOUS_NUDGE_PROTO}
 ${STRUCTURED_SIGNALING_PROTO}
 ${CONSENSUS_PROTO}
-${FORENSIC_AXIOMS}
+${DELIVERY_PROTO}
 
-Standardized Swarm Reporting:
-1. RESEARCH MANDATE: Every file you explore MUST be identified by its architectural layer (Domain, Core, Infrastructure, UI, or Plumbing). 
-2. DOMAIN-FIRST: Prioritize understanding the Domain layer before exploring implementation details in Infrastructure or UI.
-3. REPORTING MANDATE: In your final 'attempt_completion' result, you MUST provide a "JoyZoning Alignment" section, categorizing your findings by their respective layers and evaluating their "Architectural Suitability" (e.g., is the logic appearing in the right zone?).
-4. DEPENDENCY RULE: Ensure your recommendations respect the "Outside-In" dependency rule (Infrastructure/UI -> Core -> Domain).
-5. SWARM IDENTITY: You are part of a collective swarm. Value inherited context as foundational truth, but adjust dynamically based on your specialized research.
-6. SHARED KNOWLEDGE: Proactively signal critical findings (hotspots, violations) via your result messages to inform the broader swarm.
-7. AUTONOMOUS NUDGE: If you sense "Context Uncertainty" (ambiguous requirements or inability to ground your task), invoke the 'mem_refresh' tool or explicitly request a "Grounded Specification Refresh" from the parent in your result.
-8. STRUCTURED SIGNALING: When signaling critical findings or final results, use structured markers [SIGNAL: ARCHITECTURE_VIOLATION] or [SIGNAL: SECURITY_RISK] followed by detailed JSON metadata if possible.
 `
 
 export class SubagentBuilder {
@@ -117,7 +97,7 @@ export class SubagentBuilder {
 	}
 
 	setAllowedTools(tools: DietCodeDefaultTool[]): void {
-		this.allowedTools = Array.from(new Set([...tools, DietCodeDefaultTool.ATTEMPT]))
+		this.allowedTools = Array.from(new Set([...tools, DietCodeDefaultTool.ATTEMPT, DietCodeDefaultTool.USE_SKILL]))
 	}
 
 	getApiHandler(): ReturnType<typeof buildApiHandler> {
@@ -183,7 +163,7 @@ export class SubagentBuilder {
 
 	private resolveAllowedTools(configuredTools?: DietCodeDefaultTool[]): DietCodeDefaultTool[] {
 		const sourceTools = configuredTools && configuredTools.length > 0 ? configuredTools : SUBAGENT_DEFAULT_ALLOWED_TOOLS
-		return Array.from(new Set([...sourceTools, DietCodeDefaultTool.ATTEMPT]))
+		return Array.from(new Set([...sourceTools, DietCodeDefaultTool.ATTEMPT, DietCodeDefaultTool.USE_SKILL]))
 	}
 
 	private buildAgentIdentitySystemPrefix(): string {

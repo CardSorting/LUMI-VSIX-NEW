@@ -12,7 +12,7 @@ In a world of AI coding assistants, LUMI stands out by being a true **agentic pa
 
 Most AI assistants are reactive—they wait for you to type or ask a question. LUMI is **proactive**:
 
-- **Observe-Plan-Act**: LUMI doesn't just suggest code; it analyzes the problem, proposes a multi-step plan, and executes it (with your approval).
+- **Observe-Plan-Act**: LUMI doesn't just suggest code; it analyzes the problem, proposes a multi-step plan, and executes in-scope work autonomously under execution policy and hooks.
 - **Architectural Maturity (Deep Planning)**: For complex tasks, use `/deep-planning`. LUMI performs a silent investigation, builds a detailed implementation plan, and tracks progress via a visual **Focus Chain** todo list.
 - **Parallel Productivity (Worktrees)**: Unlike other AI editors that take over your screen, LUMI can work in a separate **Git Worktree**. This lets the agent build a feature in one window while you continue coding uninterrupted in your main window.
 - **Multi-Tool Integration**: LUMI can run shell commands, launch browsers, read documentation, and even create sub-agents to solve complex sub-problems.

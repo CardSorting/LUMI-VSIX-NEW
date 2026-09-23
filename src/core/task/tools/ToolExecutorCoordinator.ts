@@ -48,6 +48,7 @@ import { StabilityQueryHandler } from "./handlers/StabilityQueryHandler"
 import { StabilityRecalibrateHandler } from "./handlers/StabilityRecalibrateHandler"
 import { StabilitySweepHandler } from "./handlers/StabilitySweepHandler"
 import { UseSubagentsToolHandler } from "./handlers/SubagentToolHandler"
+import { UseSkillToolHandler } from "./handlers/UseSkillToolHandler"
 import { SummarizeTaskHandler } from "./handlers/SummarizeTaskHandler"
 import { WebFetchToolHandler } from "./handlers/WebFetchToolHandler"
 import { WebSearchToolHandler } from "./handlers/WebSearchToolHandler"
@@ -91,6 +92,7 @@ export class ToolExecutorCoordinator {
 		[DietCodeDefaultTool.GENERATE_EXPLANATION]: (_v: ToolValidator) => new GenerateExplanationToolHandler(),
 		[DietCodeDefaultTool.PROJECT_MAP]: (_v: ToolValidator) => new ProjectMapHandler(),
 		[DietCodeDefaultTool.USE_SUBAGENTS]: (_v: ToolValidator) => new UseSubagentsToolHandler(),
+		[DietCodeDefaultTool.USE_SKILL]: (_v: ToolValidator) => new UseSkillToolHandler(),
 		[DietCodeDefaultTool.RUN_FINALIZATION]: (_v: ToolValidator) => new RunFinalizationToolHandler(),
 		[DietCodeDefaultTool.MEM_QUERY]: (_v: ToolValidator) => new CognitiveMemoryQueryHandler(),
 		[DietCodeDefaultTool.MEM_SNAPSHOT]: (_v: ToolValidator) => new CognitiveMemorySnapshotHandler(),
@@ -159,7 +161,6 @@ export class ToolExecutorCoordinator {
 			toolName === DietCodeDefaultTool.MCP_USE ||
 			toolName === DietCodeDefaultTool.MCP_ACCESS ||
 			toolName === DietCodeDefaultTool.MCP_DOCS ||
-			toolName === DietCodeDefaultTool.USE_SKILL ||
 			toolName.includes("0mcp0")
 		) {
 			return undefined

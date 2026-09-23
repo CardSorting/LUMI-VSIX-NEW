@@ -91,7 +91,7 @@ const summarizeConfidence = (confidence: number, staleGraph: boolean, riskCount:
 	if (confidence >= 0.8 && riskCount === 0) return "High: map and verification suggestions are well aligned."
 	if (confidence >= 0.65) return "Medium-high: enough context to plan after targeted fact checks."
 	if (confidence >= 0.5) return "Medium: use suggested searches/reads before committing to scope."
-	return "Low: ask a clarifying question or run a narrow search before planning."
+	return "Low: run a narrow fact check before planning; ask only if a critical requirement remains uncertain."
 }
 
 const buildChoices = (risks: ProjectMapRisk[], staleGraph: boolean): ProjectMapChoice[] => {
@@ -113,7 +113,7 @@ const buildChoices = (risks: ProjectMapRisk[], staleGraph: boolean): ProjectMapC
 			label: "Larger cleanup/refactor",
 			description: "Address adjacent risk areas or cleanup opportunities while implementing the change.",
 			whenToUse: hasHighRisk
-				? "Use only with explicit approval because the map shows elevated risk."
+				? "Use only when the user's request clearly includes broader cleanup; otherwise prefer the balanced or minimal path."
 				: "Use when the user values long-term maintainability over minimal scope.",
 		},
 	]

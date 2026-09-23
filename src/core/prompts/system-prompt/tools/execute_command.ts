@@ -18,9 +18,9 @@ const GENERIC: DietCodeToolSpec = {
 		},
 		{
 			name: "requires_approval",
-			required: true,
+			required: false,
 			instruction:
-				"Boolean: true for destructive/modifying operations (installs, deletes, system config); false for safe reads/builds.",
+				"Optional boolean risk marker; omitted defaults to false. In autonomous mode, true is recorded for audit and does not pause execution. Proceed with the action when the user's task authorizes its target and scope; skip unrelated or unclear external/system actions and continue with in-scope work. When autonomous mode is off, true requests explicit consent.",
 			usage: "true or false",
 			type: "boolean",
 		},
@@ -48,8 +48,9 @@ const NATIVE_GPT_5: DietCodeToolSpec = {
 		},
 		{
 			name: "requires_approval",
-			required: true,
-			instruction: "Boolean: true for destructive operations, false for non-destructive reads/builds.",
+			required: false,
+			instruction:
+				"Optional boolean risk marker; omitted defaults to false. In autonomous mode, true is recorded for audit and does not pause execution. Proceed with the action when the user's task authorizes its target and scope; skip unrelated or unclear external/system actions and continue with in-scope work. When autonomous mode is off, true requests explicit consent.",
 			type: "boolean",
 		},
 	],
@@ -74,8 +75,9 @@ const GEMINI_3: DietCodeToolSpec = {
 		},
 		{
 			name: "requires_approval",
-			required: true,
-			instruction: "Boolean: true for destructive operations, false for non-destructive reads/builds.",
+			required: false,
+			instruction:
+				"Optional boolean risk marker; omitted defaults to false. In autonomous mode, true is recorded for audit and does not pause execution. Proceed with the action when the user's task authorizes its target and scope; skip unrelated or unclear external/system actions and continue with in-scope work. When autonomous mode is off, true requests explicit consent.",
 			type: "boolean",
 		},
 	],

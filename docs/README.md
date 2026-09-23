@@ -53,8 +53,8 @@ LUMI [forked the Cline VS Code extension](https://github.com/cline/cline) and ad
 
 | Typical autonomous agent | LUMI |
 |--------------------------|------|
-| Runs until stopped | Approval gate per mutating tool |
-| Opaque file changes | Diff view before write |
+| Runs until stopped | Autonomous execution within task scope; policy and hook enforcement with reviewable workspace changes |
+| Opaque file changes | Workspace diff and checkpoints; approval cards when required |
 | Hard to undo | Checkpoints after each tool use |
 | “Done” when model says so | Completion pipeline + roadmap gates |
 
@@ -307,4 +307,4 @@ Architecture milestone notes (archaeology only): [history/architecture/](history
 3. **Two-layer boundary** — Session UX docs live here; substrate docs live in `broccolidb/docs/`.
 4. **Measured claims** — Metrics cite verifiable paths (`package.json`, `src/shared/tools.ts`, etc.).
 
-**Calm agency:** approve before mutate, checkpoint after tool use, complete only through gates.
+**Calm agency:** proceed autonomously within declared authority, ask at protected consent boundaries, preserve recovery through checkpoints, complete only through gates.

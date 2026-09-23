@@ -13,6 +13,7 @@ type SkillsCacheEntry = {
 }
 
 const skillsCache = new Map<string, SkillsCacheEntry>()
+const skillsInFlight = new Map<string, Promise<SkillMetadata[]>>()
 
 const cacheMetrics = {
 	hits: 0,
@@ -28,9 +29,12 @@ function cacheKey(cwd: string): string {
 export function invalidateSkillsCache(cwd?: string): void {
 	if (!cwd) {
 		skillsCache.clear()
+		skillsInFlight.clear()
 		return
 	}
-	skillsCache.delete(cacheKey(cwd))
+	const key = cacheKey(cwd)
+	skillsCache.delete(key)
+	skillsInFlight.delete(key)
 }
 
 export function getSkillsCacheMetrics(): Readonly<{ hits: number; misses: number }> {
@@ -56,15 +60,31 @@ export async function getResolvedSkillsForCwd(cwd: string, forceRefresh = false)
 			cacheMetrics.lastHit = true
 			return cached.skills
 		}
+		const inFlight = skillsInFlight.get(key)
+		if (inFlight) {
+			cacheMetrics.hits++
+			cacheMetrics.lastHit = true
+			return inFlight
+		}
 	}
 
 	cacheMetrics.misses++
 	cacheMetrics.lastHit = false
 
-	const allSkills = await discoverSkills(cwd, true)
-	const resolved = getAvailableSkills(allSkills)
-	skillsCache.set(key, { skills: resolved, cachedAt: Date.now() })
-	return resolved
+	let pending: Promise<SkillMetadata[]>
+	pending = discoverSkills(cwd, true)
+		.then((allSkills) => {
+			const resolved = getAvailableSkills(allSkills)
+			if (skillsInFlight.get(key) === pending) {
+				skillsCache.set(key, { skills: resolved, cachedAt: Date.now() })
+			}
+			return resolved
+		})
+		.finally(() => {
+			if (skillsInFlight.get(key) === pending) skillsInFlight.delete(key)
+		})
+	skillsInFlight.set(key, pending)
+	return pending
 }
 
 export function filterEnabledSkills(
@@ -73,6 +93,16 @@ export function filterEnabledSkills(
 	localToggles: Record<string, boolean>,
 ): SkillMetadata[] {
 	return skills.filter((skill) => isSkillEnabled(skill, globalToggles, localToggles))
+}
+
+/** Return the enabled skill catalog used by parent and subagent prompts. */
+export async function getEnabledPromptSkills(
+	cwd: string,
+	globalToggles: Record<string, boolean>,
+	localToggles: Record<string, boolean>,
+): Promise<SkillMetadata[]> {
+	const skills = await getResolvedSkillsForCwd(cwd)
+	return filterPromptSkills(filterEnabledSkills(skills, globalToggles, localToggles))
 }
 
 /**

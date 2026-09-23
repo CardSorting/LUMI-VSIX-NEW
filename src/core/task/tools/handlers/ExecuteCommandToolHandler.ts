@@ -30,6 +30,11 @@ import { getInitialTaskPreview } from "../utils/taskPreview"
 const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30
 const LONG_RUNNING_COMMAND_TIMEOUT_SECONDS = 300
 
+function commandRequiresExplicitApproval(value?: string): boolean {
+	if (value === undefined) return false
+	return value.trim().toLowerCase() !== "false"
+}
+
 const LONG_RUNNING_COMMAND_PATTERNS: RegExp[] = [
 	/\b(npm|pnpm|yarn|bun)\s+(install|ci|build|test)\b/i,
 	/\b(npm|pnpm|yarn|bun)\s+run\s+(build|test|lint|typecheck|check)\b/i,
@@ -77,15 +82,15 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 
 	getApprovalIntent(block: ToolUse) {
 		const command = block.params.command ?? ""
-		const risky = block.params.requires_approval?.toLowerCase() !== "false"
+		const requiresExplicitApproval = commandRequiresExplicitApproval(block.params.requires_approval)
 		return declareApprovalIntent(block, {
 			description: `Execute command: ${command}`,
 			requirements: [
 				{
 					capability: "command",
-					risk: risky ? "high" : "elevated",
+					risk: requiresExplicitApproval ? "high" : "elevated",
 					requestedSideEffects: ["execute shell command"],
-					autoApprovalEligible: true,
+					autoApprovalEligible: !requiresExplicitApproval,
 				},
 			],
 			promptType: "command",
@@ -105,7 +110,6 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		let command: string | undefined = block.params.command
-		const requiresApprovalRaw: string | undefined = block.params.requires_approval
 		const timeoutParam: string | undefined = block.params.timeout
 		let timeoutSeconds: number | undefined
 		const evidenceResponse = (content: ToolResponse, overrides: Partial<CommandExecutionEvidence> = {}): ToolResponse =>
@@ -124,11 +128,6 @@ export class ExecuteCommandToolHandler implements IToolHandler, IPartialBlockHan
 		if (!command) {
 			config.taskState.consecutiveMistakeCount++
 			return await config.callbacks.sayAndCreateMissingParamError(this.name, "command")
-		}
-
-		if (!requiresApprovalRaw) {
-			config.taskState.consecutiveMistakeCount++
-			return await config.callbacks.sayAndCreateMissingParamError(this.name, "requires_approval")
 		}
 
 		config.taskState.consecutiveMistakeCount = 0

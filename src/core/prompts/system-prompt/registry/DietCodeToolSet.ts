@@ -9,7 +9,6 @@ export class DietCodeToolSet {
 		DietCodeDefaultTool.MCP_USE,
 		DietCodeDefaultTool.MCP_ACCESS,
 		DietCodeDefaultTool.MCP_DOCS,
-		DietCodeDefaultTool.USE_SKILL,
 	])
 	// A list of tools mapped by model group
 	private static variants: Map<ModelFamily, Set<DietCodeToolSet>> = new Map()
@@ -93,6 +92,7 @@ export class DietCodeToolSet {
 	public static getEnabledTools(variant: PromptVariant, context: SystemPromptContext): DietCodeToolSet[] {
 		const resolved: DietCodeToolSet[] = []
 		const requestedIds = variant.tools ? [...variant.tools] : []
+		if (context.skills?.length) requestedIds.push(DietCodeDefaultTool.USE_SKILL)
 		if (context.goldenCartridgeAvailable === true) requestedIds.push(DietCodeDefaultTool.GOLDEN_CARTRIDGE)
 		for (const id of requestedIds) {
 			if (DietCodeToolSet.disabledTools.has(id)) continue

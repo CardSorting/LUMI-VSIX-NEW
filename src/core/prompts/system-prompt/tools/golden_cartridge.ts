@@ -38,7 +38,7 @@ const GENERIC: DietCodeToolSpec = {
 			required: false,
 			type: "string",
 			instruction:
-				"Compact JSON. Common: requirement, target, evidence, refresh. patch_smallest: proposedChange/canonicalTarget/allowedFiles. disprove: proposedCommands/testFiles/knownRepositoryCommands/execute. compress: release/persistDurableMemory. seal: validationEvidence/residualRisks.",
+				"Compact JSON. Common: requirement, target, evidence, refresh. patch_smallest: proposedChange/canonicalTarget/allowedFiles. disprove: proposedCommands/testFiles/knownRepositoryCommands/execute/requiresApproval (risk marker; autonomous mode records true for audit without pausing). compress: release/persistDurableMemory. seal: validationEvidence/residualRisks.",
 		},
 	],
 }

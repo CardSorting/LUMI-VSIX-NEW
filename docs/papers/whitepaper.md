@@ -12,7 +12,7 @@
 
 ## Abstract
 
-LUMI is a VS Code extension that implements an agentic pair programmer: natural-language tasks, LLM-driven tool use, file and terminal access, browser automation, MCP integration, and **governed subagent swarms** — with **human-in-the-loop approval** on mutating actions, **conditional mutation locks** on parallel lanes, **per-agent roadmap projections** with coordinator-owned workspace commits, and **gated task completion**.
+LUMI is a VS Code extension that implements an agentic pair programmer: natural-language tasks, LLM-driven tool use, file and terminal access, browser automation, MCP integration, and **governed subagent swarms** — with autonomous in-scope execution, **conditional mutation locks** on parallel lanes, **per-agent roadmap projections** with coordinator-owned workspace commits, and **verified task completion**.
 
 The system composes five major parts:
 
@@ -65,7 +65,7 @@ BroccoliDB substrate metrics (69 test files, 12 capabilities, etc.) are document
 
 These are observable in code, not merely documented:
 
-1. **Human-in-the-loop default** — Mutating tools flow through approval UI; `READ_ONLY_TOOLS` (12 entries) is an explicit allowlist for non-blocking exploration.
+1. **Policy-bound autonomy** — Every tool flows through `ExecutionFunnel`; autonomous mode removes per-tool consent prompts while execution policy, hooks, authority, and lifecycle checks remain active. `READ_ONLY_TOOLS` (12 entries) remains the checkpoint-safe allowlist.
 
 2. **Typed tool routing** — Every agent capability maps to `DietCodeDefaultTool` and a handler registered in `ToolExecutorCoordinator.toolHandlersMap`.
 
@@ -328,7 +328,7 @@ Full architecture: [Completion lifecycle decision engine](../completion-lifecycl
 - Completion gates: `subagentCompletionGates.ts`
 - Swarm consensus: `SwarmConsensusHandler`, shared memory tools (`mem_claim`, `mem_release`, `mem_hubs`)
 
-Subagents inherit parent approval and hook settings.
+Subagents inherit task policy and hooks. Autonomous mode does not require a second prompt to delegate in-scope work; lane authority, locks, and child tool policies remain enforced.
 
 ### 8.2 Governed swarm harness
 
@@ -600,7 +600,7 @@ Implementation: `src/services/roadmap/` (26 files).
 
 | Control | Implementation |
 |---------|----------------|
-| Approval before mutation | Tool UI + auto-approve rules |
+| Consent for protected actions | Handler eligibility + `ExecutionFunnel`; routine in-scope work proceeds autonomously |
 | Governed mutation locks | `LockAuthority` — layered lease + fencing; lock-skipped for non-mutating lanes |
 | Swarm merge gate | Write-set reconciliation before `sealed: true` |
 | Secret exclusion | `.dietcodeignore`, user discipline |
@@ -636,7 +636,7 @@ Extension activation: `src/extension.ts` (~788 lines). Registry: `src/registry.t
 
 | Guaranteed | Not guaranteed |
 |------------|----------------|
-| Default approval path for mutating tools | Correct LLM reasoning |
+| ExecutionFunnel decision for every tool; autonomous dispatch remains policy- and authority-checked | Correct LLM reasoning |
 | 6 providers wired in `buildApiHandler` | All provider UI components functional |
 | 64 enum tool names; coordinator routing | Every enum has active handler (some reserved) |
 | Completion pipeline on `attempt_completion` | Zero false gate blocks |

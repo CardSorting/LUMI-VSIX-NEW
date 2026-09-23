@@ -30,6 +30,8 @@ Use this when you change code and need to update the matching doc.
 | Source | Documentation |
 |--------|---------------|
 | `src/core/task/tools/execution/ExecutionFunnel.ts` | [Auto-approve](features/auto-approve.mdx) · [Central execution funnel](parent-thread-execution-authority.md) |
+| `src/core/context/instructions/user-instructions/skills.ts` · `src/core/task/tools/handlers/UseSkillToolHandler.ts` | [Skills](customization/skills.mdx) · [Project map](PROJECT_MAP.md) |
+| `src/core/task/tools/handlers/ExecuteCommandToolHandler.ts` | [Auto-approve](features/auto-approve.mdx) · [Security](SECURITY_BEST_PRACTICES.md) |
 | `src/core/task/lifecycle/TaskLifecycleFunnel.ts` | [Task lifecycle authority](task-lifecycle-authority.md) · [Cancellation](task-cancellation.md) · [Resume and recovery](task-resume-recovery.md) |
 | `src/core/task/lifecycle/TaskLifecyclePersistence.ts` | [Task lifecycle authority](task-lifecycle-authority.md) |
 | `src/shared/lifecycle/taskLifecycleEvent.ts` | [Task lifecycle authority](task-lifecycle-authority.md) |

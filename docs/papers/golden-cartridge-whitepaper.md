@@ -14,7 +14,7 @@ The **Golden Cartridge Protocol** introduces a resource-constrained developer ag
 
 ### Technical Scope & Boundaries
 * **Overlay Architecture**: The protocol is implemented as a one-way facade tool (`golden_cartridge`). It coordinates but never replaces the core tool schema.
-* **Non-Enforcing**: The facade does not override repository write rules, block execution, or authorize task completion. All mutating operations retain their default user-approval gates.
+* **Non-Enforcing**: The facade does not override repository write rules, block execution, or authorize task completion. Mutating operations still pass through `ExecutionFunnel` and follow the active eligibility, consent, and execution policies.
 * **Telemetry and Cache Acceleration**: Utilizes workspace revision tracking and mutation signals to cache intermediate structural evidence, reducing redundant read operations.
 
 ---

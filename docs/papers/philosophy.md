@@ -12,11 +12,11 @@
 
 **A coding companion is not finished until you can keep it open all day without feeling managed by it.**
 
-LUMI (`CardSorting.lumi`, `package.json` v2.1.3) is the **agent layer** of the [LUMI monorepo](https://github.com/CardSorting/LUMI): a VS Code extension that plans, proposes, and executes — but never assumes consent. Comfort is UX. **Agency with approval** is architecture.
+LUMI (`CardSorting.lumi`, `package.json` v2.1.3) is the **agent layer** of the [LUMI monorepo](https://github.com/CardSorting/LUMI): a VS Code extension that plans and executes in-scope work autonomously, with policy, hooks, workspace authority, and recovery checks. Comfort is UX. **Agency with clear boundaries** is architecture.
 
-BroccoliDB (`@noorm/broccolidb`) governs repository substrate — proof, repair, durable graph truth. LUMI governs **the human session** — chat, diffs, terminal, browser, MCP, governed swarm receipts, and the moment you click Approve.
+BroccoliDB (`@noorm/broccolidb`) governs repository substrate — proof, repair, durable graph truth. LUMI governs **the human session** — chat, diffs, terminal, browser, MCP, and governed swarm receipts.
 
-Confusing the two — letting companion warmth substitute for approval discipline — is how agents become fluent without becoming trustworthy.
+Trust comes from useful autonomy within clear scope, recorded decisions, and reliable recovery when work goes wrong.
 
 ---
 
@@ -47,13 +47,13 @@ Session    → Controller + StateManager
 Reason     → buildApiHandler → LLM stream
 Act        → ToolExecutorCoordinator → handlers/*
 Physical   → HostProvider.hostBridge (gRPC)
-Consent    → Approve / Reject / Auto-approve rules
+Admission  → ExecutionFunnel policy and linked permits
 Finish     → attempt_completion → completionGatePipeline
 Swarm      → classify intent → acquire projection → merge gate → reconcile patches → coordinator commit → seal receipt
 Truth      → BroccoliDB graph + governed receipts on disk
 ```
 
-Crossing a boundary — mutating without approval, skipping hooks when enabled, completing without gate passage — is misuse the pipeline is designed to block or surface.
+Crossing a boundary — running outside the user's task scope, skipping enabled hooks, or completing without required verification — is misuse the pipeline is designed to block or surface.
 
 ---
 
@@ -66,10 +66,10 @@ The webview north star (`webview-ui/docs/LUMI_UX.md`):
 That is not softness about safety. It is **respect for attention**:
 
 - Copy lives in `webview-ui/src/copy/lumiVoice.ts` — conversational, not alarmist.
-- Long sessions use comfort hooks (`useLumiSessionComfort.ts`) — reduce visual noise, not reduce gates.
+- Long sessions use comfort hooks (`useLumiSessionComfort.ts`) — reduce repeated prompts while preserving consent boundaries and recovery.
 - Audit presentation reads like a notebook (`auditUiStyles.ts`), not a tribunal.
 
-**Calm is not passive.** LUMI still shows every diff. It still asks before `execute_command`. It still runs completion gates before `attempt_completion` succeeds. For governed swarms, the **incident console** (`GovernedReceiptPanel`) shows execution mode, lock skipped/required, accepted/rejected patches, rebase outcomes, and commit status — so operators see what each agent proposed without false "missing lock" alarms on read lanes.
+**Calm is not passive.** LUMI keeps workspace changes reviewable, proceeds without per-tool approval prompts, and runs completion checks before `attempt_completion` succeeds. Execution policy and hooks remain active. For governed swarms, the **incident console** (`GovernedReceiptPanel`) shows execution mode, lock skipped/required, accepted/rejected patches, rebase outcomes, and commit status — so operators see what each agent proposed without false "missing lock" alarms on read lanes.
 
 Teachability is trust. If the UI hides what the agent did, the companion has failed. If the UI cries "missing lock" on a read-only audit lane, the companion has also failed.
 
@@ -82,7 +82,7 @@ Modes (`src/shared/storage/types.ts`: `"plan" | "act"`) are not difficulty setti
 | Mode | Tool | Philosophy |
 |------|------|------------|
 | **Plan** | `plan_mode_respond` | Understand before touching — read, search, discuss |
-| **Act** | `act_mode_respond` | Implement with explicit tool approval |
+| **Act** | `act_mode_respond` | Implement in-scope work autonomously under execution policy |
 
 Plan and Act can use **different providers** (`planModeApiProvider`, `actModeApiProvider`). Thinking cheaply and acting precisely is a design affordance, not a hack.
 
@@ -90,19 +90,19 @@ Plan and Act can use **different providers** (`planModeApiProvider`, `actModeApi
 
 ---
 
-## V. Approval is the contract
+## V. Execution admission is the contract
 
 LUMI's power is physical access: files, shell, browser, MCP. The contract:
 
-1. **Propose** — tool call visible in chat with parameters.
-2. **Review** — diff view for edits; output preview for commands.
-3. **Consent** — user approves, rejects, or auto-approve rule matches.
-4. **Execute** — host bridge performs the action.
-5. **Record** — result returns to conversation; hooks fire.
+1. **Declare** — handler records the operation, scope, side effects, and approval metadata.
+2. **Decide** — `ExecutionFunnel` applies autonomous mode, policy, hooks, workspace/lane authority, and per-capability settings.
+3. **Admit or deny** — authorized in-scope work proceeds without per-tool consent in autonomous mode; policy or authority can still deny dispatch.
+4. **Execute** — a linked permit authorizes the host bridge to perform the action.
+5. **Record** — result and decision return to the conversation and audit trail.
 
-`READ_ONLY_TOOLS` in `src/shared/tools.ts` (12 tools) may run without blocking checkpoint commits — exploration should not feel like negotiation. **Mutation always earns scrutiny** unless you explicitly configure otherwise.
+`READ_ONLY_TOOLS` in `src/shared/tools.ts` (12 tools) may run without blocking checkpoint commits — exploration should not feel like negotiation. Autonomous mode removes per-operation consent prompts across the in-scope task; policy, hooks, authority, and lifecycle checks still apply.
 
-Auto-approve is opt-in trust, not default autonomy.
+Autonomy is configurable, bounded by task scope and execution policy, and recorded for every tool call.
 
 ---
 

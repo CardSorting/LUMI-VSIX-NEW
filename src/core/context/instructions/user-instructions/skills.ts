@@ -23,6 +23,7 @@ export {
 	filterEnabledSkills,
 	filterPromptSkills,
 	filterSubagentPromptSkills,
+	getEnabledPromptSkills,
 	getResolvedSkillsForCwd,
 	getSkillsCacheMetrics,
 	invalidateSkillsCache,
@@ -40,6 +41,26 @@ function parseFrontmatter(fileContent: string): { data: Record<string, unknown>;
 }
 
 const MAX_SKILL_FILE_SIZE_BYTES = 512 * 1024 // 512 KB safeguard against memory corruption/DoS
+const SKILL_SCAN_CONCURRENCY = 8
+
+async function readBoundedSkillFile(filePath: string): Promise<Buffer | null> {
+	const handle = await fs.open(filePath, "r")
+	try {
+		const stats = await handle.stat()
+		if (!stats.isFile() || stats.size > MAX_SKILL_FILE_SIZE_BYTES) return null
+
+		const buffer = Buffer.allocUnsafe(MAX_SKILL_FILE_SIZE_BYTES + 1)
+		let bytesRead = 0
+		while (bytesRead < buffer.length) {
+			const result = await handle.read(buffer, bytesRead, buffer.length - bytesRead, bytesRead)
+			if (result.bytesRead === 0) return buffer.subarray(0, bytesRead)
+			bytesRead += result.bytesRead
+		}
+		return null
+	} finally {
+		await handle.close()
+	}
+}
 
 export interface SkillDiagnostic {
 	path: string
@@ -78,6 +99,10 @@ function isValidSkillDirName(name: string): boolean {
 	return true
 }
 
+function isValidAgentSkillName(name: string): boolean {
+	return name.length <= 64 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
+}
+
 /**
  * Scan a directory for skill subdirectories containing SKILL.md files and collect diagnostics.
  */
@@ -95,20 +120,24 @@ async function scanSkillsDirectoryWithDiagnostics(
 	try {
 		const entries = await fs.readdir(dirPath)
 
-		for (const entryName of entries) {
-			if (!isValidSkillDirName(entryName)) continue
+		const results: Array<Awaited<ReturnType<typeof loadSkillMetadataWithDiagnostic>> | null> = []
+		for (let offset = 0; offset < entries.length; offset += SKILL_SCAN_CONCURRENCY) {
+			const batch = entries.slice(offset, offset + SKILL_SCAN_CONCURRENCY)
+			const batchResults = await Promise.all(
+				batch.map(async (entryName) => {
+					if (!isValidSkillDirName(entryName)) return null
+					const entryPath = path.join(dirPath, entryName)
+					const stats = await fs.stat(entryPath).catch(() => null)
+					if (!stats?.isDirectory()) return null
+					return loadSkillMetadataWithDiagnostic(entryPath, source, entryName)
+				}),
+			)
+			results.push(...batchResults)
+		}
 
-			const entryPath = path.join(dirPath, entryName)
-			const stats = await fs.stat(entryPath).catch(() => null)
-			if (!stats?.isDirectory()) continue
-
-			const result = await loadSkillMetadataWithDiagnostic(entryPath, source, entryName)
-			if (result.skill) {
-				skills.push(result.skill)
-			}
-			if (result.diagnostic) {
-				diagnostics.push(result.diagnostic)
-			}
+		for (const result of results) {
+			if (result?.skill) skills.push(result.skill)
+			if (result?.diagnostic) diagnostics.push(result.diagnostic)
 		}
 	} catch (error: unknown) {
 		if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "EACCES") {
@@ -219,6 +248,14 @@ async function loadSkillMetadataWithDiagnostic(
 				},
 			}
 		}
+		if (!isValidAgentSkillName(name)) {
+			// Keep older local skills usable while making the portability issue visible.
+			Logger.warn(`Skill at ${skillDir} uses a non-standard name; Agent Skills names should be <=64 lowercase letters, numbers, and single hyphens`)
+		}
+		if (description.length > 1024) {
+			// Keep local resolution non-blocking; prompt metadata is bounded separately.
+			Logger.warn(`Skill at ${skillDir} has a description longer than the 1024-character Agent Skills limit`)
+		}
 
 		if (name !== skillName) {
 			Logger.warn(`Failed to load skill at ${skillDir}: skill name "${name}" doesn't match directory "${skillName}"`)
@@ -266,17 +303,25 @@ export async function discoverSkillsWithDiagnostics(cwd: string, includeOptional
 	const diagnostics: SkillDiagnostic[] = []
 
 	const scanDirs = getSkillsDirectoriesForScan(cwd)
-
-	for (const dir of scanDirs) {
-		const result = await scanSkillsDirectoryWithDiagnostics(dir.path, dir.source)
+	const roadmapConfig = getRoadmapConfig()
+	const bundledRoadmapPromise = getBundledRoadmapSkillMetadata()
+	const bundledGoldenPromise =
+		includeOptionalBundled && roadmapConfig.auto_install_skills
+			? getBundledSkillMetadata(GOLDEN_CARTRIDGE_SKILL_NAME, GOLDEN_CARTRIDGE_SKILL_DESCRIPTION, false).catch(() => null)
+			: Promise.resolve(null)
+	const [directoryResults, bundledSkill, gcSkill] = await Promise.all([
+		Promise.all(scanDirs.map((dir) => scanSkillsDirectoryWithDiagnostics(dir.path, dir.source))),
+		bundledRoadmapPromise,
+		bundledGoldenPromise,
+	])
+	for (const result of directoryResults) {
 		skills.push(...result.skills)
 		diagnostics.push(...result.diagnostics)
 	}
 
-	const bundledSkill = await getBundledRoadmapSkillMetadata()
 	if (bundledSkill) {
 		skills.push(bundledSkill)
-	} else if (getRoadmapConfig().auto_install_skills) {
+	} else if (roadmapConfig.auto_install_skills) {
 		diagnostics.push({
 			path: `${BUNDLED_SKILL_URI_PREFIX}${BUNDLED_SKILL_NAME}`,
 			dirName: BUNDLED_SKILL_NAME,
@@ -286,13 +331,8 @@ export async function discoverSkillsWithDiagnostics(cwd: string, includeOptional
 		})
 	}
 
-	if (includeOptionalBundled && getRoadmapConfig().auto_install_skills) {
-		try {
-			const gcSkill = await getBundledSkillMetadata(GOLDEN_CARTRIDGE_SKILL_NAME, GOLDEN_CARTRIDGE_SKILL_DESCRIPTION, false)
-			if (gcSkill) {
-				skills.push(gcSkill)
-			}
-		} catch {}
+	if (gcSkill) {
+		skills.push(gcSkill)
 	}
 
 	return { skills, diagnostics }
@@ -357,7 +397,12 @@ export async function getSkillContent(
 
 	try {
 		const readPath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX) ? await bundledSkillPath(skill.name) : skill.path
-		const fileContent = await fs.readFile(readPath, "utf-8")
+		const fileContentBuffer = await readBoundedSkillFile(readPath)
+		if (!fileContentBuffer) {
+			Logger.warn(`Skill at ${readPath} is not a regular file or exceeds the maximum file size limit`)
+			return null
+		}
+		const fileContent = fileContentBuffer.toString("utf-8")
 		if (fileContent.includes("\0")) {
 			Logger.warn(`Corrupt binary content detected when loading skill instructions for ${skill.name}`)
 			return null
@@ -370,6 +415,42 @@ export async function getSkillContent(
 		}
 	} catch (error) {
 		Logger.warn(`Failed to read skill content at ${skill.path}:`, error)
+		return null
+	}
+}
+
+/** Load one explicitly requested text resource from inside a skill directory. */
+export async function getSkillResourceContent(skill: SkillMetadata, requestedPath: string): Promise<string | null> {
+	const normalizedPath = requestedPath.trim().replace(/\\/g, path.sep)
+	if (
+		!normalizedPath ||
+		path.isAbsolute(normalizedPath) ||
+		/^[a-z]:/i.test(normalizedPath) ||
+		normalizedPath.split(path.sep).some((segment) => segment === "..")
+	) {
+		return null
+	}
+
+	try {
+		const skillFilePath = skill.path.startsWith(BUNDLED_SKILL_URI_PREFIX)
+			? await bundledSkillPath(skill.name)
+			: skill.path
+		const skillRoot = await fs.realpath(path.dirname(skillFilePath))
+		const resourcePath = path.resolve(skillRoot, normalizedPath)
+		const relativePath = path.relative(skillRoot, resourcePath)
+		if (relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) return null
+
+		const resourceRealPath = await fs.realpath(resourcePath)
+		const relativeRealPath = path.relative(skillRoot, resourceRealPath)
+		if (relativeRealPath === ".." || relativeRealPath.startsWith(`..${path.sep}`) || path.isAbsolute(relativeRealPath)) {
+			return null
+		}
+
+		const content = await readBoundedSkillFile(resourceRealPath)
+		if (!content || content.includes(0)) return null
+		return content.toString("utf-8")
+	} catch (error) {
+		Logger.warn(`Failed to read skill resource for ${skill.name}:`, error)
 		return null
 	}
 }

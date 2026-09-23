@@ -81,7 +81,7 @@ export async function parseSlashCommands(
 		compact: condenseToolResponse(focusChainSettings),
 		newrule: newRuleToolResponse(),
 		reportbug: reportBugToolResponse(),
-		"deep-planning": deepPlanningToolResponse(focusChainSettings, providerInfo, willUseNativeTools, modEnabled),
+		"deep-planning": deepPlanningToolResponse(focusChainSettings, providerInfo, modEnabled),
 		replan: replanToolResponse(),
 		"explain-changes": explainChangesToolResponse(),
 		document: documentToolResponse(),

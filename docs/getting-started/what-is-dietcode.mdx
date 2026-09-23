@@ -4,7 +4,7 @@ sidebarTitle: "What is LUMI?"
 description: "An AI coding agent in VS Code. Read files, run commands, and build features through natural language."
 ---
 
-LUMI is an AI coding agent that runs as a VS Code extension (`CardSorting.lumi`). It gives you direct access to frontier models through supported providers, with approval gates on every file change and shell command.
+LUMI is an AI coding agent that runs as a VS Code extension (`CardSorting.lumi`). It gives you direct access to supported model providers and autonomously carries out in-scope work, with execution policy, hooks, workspace authority, and recovery checks applied throughout.
 
 ## Get started
 
@@ -26,10 +26,10 @@ LUMI is an AI coding agent that runs as a VS Code extension (`CardSorting.lumi`)
 
 ## What LUMI can do
 
-With your permission, LUMI can:
+LUMI can:
 
-- **Read and write files** — Navigate the workspace, create files, and apply targeted edits. Changes appear in the diff view before you approve.
-- **Run terminal commands** — Execute tests, install packages, and debug with live output.
+- **Read and write files** — Navigate the workspace, create files, and apply targeted edits. Review changes in the workspace diff and restore with checkpoints.
+- **Run terminal commands** — Execute tests, install packages, and debug with live output. Commands marked as requiring consent pause for approval.
 - **Use a browser** — Launch Puppeteer to test web apps and capture screenshots.
 - **Connect external tools** — Extend capabilities with [MCP servers](/mcp/mcp-overview).
 - **Delegate to subagents** — Spawn background agents for parallel research or verification ([subagents](/features/subagents)).
@@ -52,7 +52,7 @@ LUMI operates directly on your local project:
 - **Local files** — Reads and writes in your workspace; respects `.dietcodeignore`.
 - **Local terminal** — Commands run in your environment with your installed tools.
 - **Local persistence** — Task history and cognitive memory use BroccoliDB (SQLite) on your machine via `@noorm/broccolidb`.
-- **Human-in-the-loop** — Mutating tools require approval unless auto-approve rules allow them.
+- **Autonomous execution** — In-scope work proceeds without per-tool approval prompts; execution policy and configured hooks still govern dispatch.
 
 ## Supported model providers
 
@@ -75,7 +75,7 @@ User-facing copy says **LUMI**. Code and config may still reference **DietCode**
 
 ## Why LUMI
 
-- **Agency with control** — Terminal, browser, and file tools with explicit approval.
+- **Agency with control** — Terminal, browser, and file tools with configurable autonomy and consent boundaries.
 - **Local-first context** — BroccoliDB stores task history and memory on disk.
 - **Provider choice** — Switch models without leaving the sidebar.
 - **Extensibility** — MCP, hooks, skills, workflows, and subagents.

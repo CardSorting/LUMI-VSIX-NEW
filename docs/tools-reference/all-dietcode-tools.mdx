@@ -127,7 +127,7 @@ Controlled by VS Code settings `lumi.roadmap.*` in `package.json`.
 
 ## Approval behavior
 
-Mutating tools require user approval unless [auto-approve](/features/auto-approve) rules match. Read-only tools are listed in `READ_ONLY_TOOLS` in `src/shared/tools.ts`.
+Every tool call receives an `ExecutionFunnel` decision. Autonomous mode proceeds without per-tool consent prompts for agent-selected operations; execution policy, hooks, workspace/lane authority, cancellation, and lifecycle checks still govern dispatch. With autonomous mode off, [Auto Approve](/features/auto-approve) settings and handler eligibility govern automatic calls. Read-only tools are listed in `READ_ONLY_TOOLS` in `src/shared/tools.ts`.
 
 ## Source
 

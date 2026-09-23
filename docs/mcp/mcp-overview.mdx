@@ -27,7 +27,7 @@ MCP servers define a set of "**tools,**" which are functions the LLM can execute
 
 -   **MCP hosts** discover the capabilities of connected servers and load their tools, prompts, and resources.
 -   **Resources** provide consistent access to read-only data, akin to file paths or database queries.
--   **Security** is ensured as servers isolate credentials and sensitive data. Interactions require explicit user approval.
+-   **Security** depends on trusted server configuration and LUMI's execution policy. MCP tool calls use the same funnel as other tools; autonomous mode removes per-tool consent prompts while execution policy, hooks, workspace/lane authority, and MCP settings continue to govern dispatch.
 
 ## Use Cases
 
@@ -108,7 +108,7 @@ When working with MCP servers, it's important to follow security best practices:
 
 MCP server configs live in user/workspace settings and sync via `src/core/storage/remote-config/syncRemoteMcpServers.ts`. LUMI ships with **no pre-installed servers** — you add them via [Adding and Configuring Servers](/mcp/adding-and-configuring-servers) or the MCP Marketplace.
 
-See [SECURITY_BEST_PRACTICES](/SECURITY_BEST_PRACTICES) for approval gates on MCP tool calls.
+See [SECURITY_BEST_PRACTICES](/SECURITY_BEST_PRACTICES) for consent boundaries on MCP tool calls.
 
 ## Resources
 

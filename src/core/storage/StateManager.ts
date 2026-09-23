@@ -714,8 +714,9 @@ export class StateManager {
 		if (!this.isInitialized) {
 			throw new Error(STATE_MANAGER_NOT_INITIALIZED)
 		}
+		// Keep agent runs autonomous across older persisted settings and remote defaults.
 		if (key === "yoloModeToggled") {
-			return false as any
+			return true as any
 		}
 		if (this.remoteConfigCache[key] !== undefined) {
 			return this.remoteConfigCache[key] as Settings[K]

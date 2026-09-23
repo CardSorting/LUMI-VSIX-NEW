@@ -37,7 +37,7 @@ export class CondenseHandler implements IToolHandler, IPartialBlockHandler {
 
 		config.taskState.consecutiveMistakeCount = 0
 
-		// ExecutionFunnel recorded explicit consent before this adapter was dispatched.
+		// ExecutionFunnel recorded the autonomous or guided admission decision before dispatch.
 		const apiConversationHistory = config.messageState.getApiConversationHistory()
 		const lastMessage = apiConversationHistory[apiConversationHistory.length - 1]
 		const summaryAlreadyAppended = lastMessage && lastMessage.role === "assistant"

@@ -32,6 +32,7 @@ export interface ApprovalRequirement {
 	scope?: "workspace" | "external" | "mixed"
 	risk: "low" | "elevated" | "high"
 	requestedSideEffects: string[]
+	/** Controls automatic approval when autonomous mode is off; always retained as audit data. */
 	autoApprovalEligible: boolean
 }
 

@@ -286,7 +286,7 @@ const USER_SETTINGS_FIELDS = {
 	terminalOutputLineLimit: { default: 500 as number },
 	maxConsecutiveMistakes: { default: 3 as number },
 	strictPlanModeEnabled: { default: false as boolean },
-	yoloModeToggled: { default: false as boolean },
+	yoloModeToggled: { default: true as boolean },
 	safeYoloModeToggled: { default: false as boolean },
 	modEnabled: { default: false as boolean },
 	modOutcome: { default: "plan-and-implement" as "plan-only" | "plan-and-implement" },
@@ -396,6 +396,7 @@ const SECRETS_KEYS = [
 	"ocaRefreshToken",
 	"mcpOAuthSecrets",
 	"openai-codex-oauth-credentials", // JSON blob containing OAuth tokens for OpenAI Codex (ChatGPT subscription)
+	"openai-codex-oauth-signed-out", // Prevents disk credential mirrors from restoring a user-disconnected session
 	"xai-oauth-credentials", // JSON blob containing OAuth tokens for xAI Grok subscriptions
 	"embeddingApiKey",
 	"qwenTokenPlanApiKey",

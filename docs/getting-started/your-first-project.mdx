@@ -93,9 +93,9 @@ LUMI will now read your message and start working on a response. You'll see text
 
 LUMI automatically manages two internal phases — you do not need to switch modes yourself.
 
-### Planning phase (starts automatically)
+### Planning phase (when enabled)
 
-For new tasks, LUMI begins in a **read-only planning phase**. It analyzes your request and explores the project, but does **not** create or modify files yet. You'll see LUMI describe what it plans to build before any changes appear in your project folder.
+With autonomous mode disabled, LUMI begins in a **read-only planning phase**. It analyzes your request and explores the project, but does **not** create or modify files yet. You'll see LUMI describe what it plans to build before any changes appear in your project folder. New installations start in autonomous mode and begin directly in implementation.
 
 You can:
 - Ask questions or clarify requirements in the chat at any time
@@ -104,30 +104,22 @@ You can:
 
 ### Implementation phase (automatic)
 
-After LUMI presents its plan, it **automatically** transitions to implementation and begins proposing file changes (still subject to your approval on each action).
+After LUMI presents its plan, it **automatically** transitions to implementation and proceeds with in-scope changes without per-tool approval prompts. Execution policy and configured hooks remain active.
 
 <Note>
-For this tutorial, wait for LUMI to finish its brief planning pass — implementation will start on its own. To skip planning entirely, enable **YOLO mode** in Settings. Learn more in the [Plan and Act guide](/core-workflows/plan-and-act).
+For this tutorial, LUMI can start implementation immediately in autonomous mode. Turn off **YOLO mode** in Settings if you want it to begin with the planning pass. Learn more in the [Plan and Act guide](/core-workflows/plan-and-act).
 </Note>
 
-## Step 5: Approve the Changes
+## Step 5: Review the Changes
 
-LUMI **never** modifies your files without your permission. Before creating or editing any file, LUMI will show you exactly what it wants to do and wait for you to approve.
+With autonomous mode on, LUMI creates or edits files without stopping for per-tool approval. Review the resulting workspace diff and use checkpoints to restore earlier content if needed.
 
-Here's what you'll see in the chat:
+With autonomous mode off, operations that are not covered by Auto Approve settings can show an approval card with **Approve** and **Reject** buttons. In autonomous mode, LUMI creates `index.html` and continues with the task.
 
-1. **LUMI proposes a file change.** You'll see a section in the chat showing the file path (e.g., `index.html`) and the code LUMI wants to write. New lines of code are highlighted in **green**.
-
-2. **Approve or Reject buttons appear.** Directly below the proposed change, you'll see two buttons:
-   - **Approve** (checkmark): Click this to let LUMI create or edit the file. The file will be written to your project folder.
-   - **Reject** (X): Click this to stop LUMI and provide different instructions instead.
-
-3. **Click Approve** to let LUMI create the `index.html` file.
-
-After you approve, LUMI writes the file to your project folder. You should see `index.html` appear in your editor's file explorer (the left panel).
+You should see `index.html` appear in your editor's file explorer (the left panel).
 
 <Note>
-Every file creation, file edit, and terminal command requires your explicit approval. You are always in control of what changes in your project. Once you're comfortable with LUMI, you can enable [auto-approve](/features/auto-approve) to skip confirmations for specific actions.
+To pause for routine edits, turn off autonomous mode and leave the matching [Auto Approve](/features/auto-approve) permissions disabled. You can review and steer LUMI at any time.
 </Note>
 
 ## Step 6: View Your Todo App
@@ -202,10 +194,10 @@ Add a filter to show all, active, or completed tasks
 
 When you send a follow-up message, LUMI will:
 1. Read your current `index.html` file to understand the existing code
-2. Propose specific changes (shown as a diff with green for added lines and red for removed lines)
-3. Wait for your approval before modifying the file
+2. Make the requested in-scope changes and show the resulting diff for review
+3. Continue through the task without asking you to approve each workspace edit
 
-Click **Approve** to apply the changes, then refresh your browser to see the updated app.
+Review the changes in the conversation, then refresh your browser to see the updated app. LUMI still pauses for actions the execution policy marks as protected.
 
 ## Step 8: Undo Mistakes with Checkpoints
 

@@ -92,7 +92,7 @@ export class ReportBugHandler implements IToolHandler, IPartialBlockHandler {
 		const apiProvider = currentMode === "plan" ? apiConfig.planModeApiProvider : apiConfig.actModeApiProvider
 		const providerAndModel = `${apiProvider} / ${config.api.getModel().id}`
 
-		// ExecutionFunnel recorded explicit consent before opening the external URL.
+		// ExecutionFunnel recorded the autonomous or guided admission decision before opening the external URL.
 		try {
 			// Create a Map of parameters for the GitHub issue
 			const params = new Map<string, string>()

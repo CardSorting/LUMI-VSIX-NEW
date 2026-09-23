@@ -10,7 +10,7 @@
 
 ## One sentence
 
-**LUMI** (`CardSorting.lumi-vscode` on VS Marketplace, `CardSorting.lumi` on Open VSX) is a VS Code agent extension in the [LUMI monorepo](https://github.com/CardSorting/LUMI): Plan/Act modes, 64 typed tools, human-in-the-loop approval, MCP and governed subagent execution, and BroccoliDB-backed memory — designed as a calm coding companion you can keep open all day.
+**LUMI** (`CardSorting.lumi-vscode` on VS Marketplace, `CardSorting.lumi` on Open VSX) is a VS Code agent extension in the [LUMI monorepo](https://github.com/CardSorting/LUMI): Plan/Act modes, 64 typed tools, autonomous in-scope execution with policy and authority checks, MCP and governed subagent execution, and BroccoliDB-backed memory — designed as a calm coding companion you can keep open all day.
 
 ---
 
@@ -54,7 +54,7 @@ Developers want an AI pair programmer **inside the editor** — not a separate a
 
 | Need | LUMI answer |
 |------|-------------|
-| See what changed before it lands | Diff view + approve/reject per tool |
+| Review changes and recover | Workspace diff + checkpoints; approval cards when required |
 | Long sessions without context collapse | `/compact`, `summarize_task`, BroccoliDB memory tools |
 | Plan before mutating | Plan mode + `plan_mode_respond` |
 | Extend with company tools | MCP via `use_mcp_tool` |
@@ -76,7 +76,7 @@ LUMI applies **fail-closed verification** at three layers. All three favor teach
 
 | Gate | Trigger | Blocks when | Operator surface |
 |------|---------|-------------|------------------|
-| **Tool** | Mutating tool call | User rejects (or hook cancels) | Diff view + approval card |
+| **Tool** | Every invocation | Policy denies, consent is rejected, or a hook cancels | Automatic permit record or approval card |
 | **Task** | `attempt_completion` | `completionGatePipeline` fails | Model guidance + roadmap messages |
 | **Swarm** | `use_subagents` seal | `MergeGate` + patch reconciliation fail | `GovernedReceiptPanel` violations + rejected patch reasons |
 
@@ -111,7 +111,7 @@ Governed swarm branch (use_subagents):
     → GovernedReceiptPanel (incident console)
 ```
 
-**Hard rules:** mutating tools require approval (unless auto-approve); `attempt_completion` runs `completionGatePipeline`; hooks can cancel but do not silently write files; swarm success requires merge gate pass + patch reconciliation; workspace roadmap commits are coordinator-only under `roadmap:workspace` lock; roadmap orchestration lease must succeed before lanes run; timeout/abort seals via `sealCrashReceipt` — **locks protect mutation, receipts preserve truth, private projection is cheap**.
+**Hard rules:** every tool receives one funnel decision; autonomous mode removes per-tool consent prompts while policy, hooks, task scope, and authority checks still govern dispatch; `attempt_completion` runs `completionGatePipeline`; hooks can cancel but do not silently write files; swarm success requires merge gate pass + patch reconciliation; workspace roadmap commits are coordinator-only under `roadmap:workspace` lock; roadmap orchestration lease must succeed before lanes run; timeout/abort seals via `sealCrashReceipt` — **locks protect mutation, receipts preserve truth, private projection is cheap**.
 
 **Coordination planes:** Agent roadmap owns private projection. Swarm roadmap owns plan linkage. Workspace roadmap owns authoritative kanban (coordinator commit only). Roadmap service owns admission. Audit owns verification. MergeGate owns commit barrier. BroccoliDB owns fencing/replay substrate. Receipts own truth under `subagent_executions/`.
 
@@ -208,7 +208,7 @@ Docs: [governed-subagent-execution.md](../governed-subagent-execution.md) · [ru
 | Mode | Response tool | Typical posture |
 |------|---------------|-----------------|
 | `plan` | `plan_mode_respond` | Read, search, discuss — no writes |
-| `act` | `act_mode_respond` | Implement — mutating tools with approval |
+| `act` | `act_mode_respond` | Implement — in-scope operations proceed autonomously under execution policy |
 
 Each mode can use a **different provider and model** (`planModeApiProvider`, `actModeApiProvider`).
 
@@ -290,7 +290,7 @@ npm run test:unit -- --grep "governed execution"   # swarm harness contracts
 
 | Guaranteed in this workspace | Not guaranteed |
 |-------------------------------|----------------|
-| Approval path for mutating tools (default) | LLM output correctness |
+| Execution decision for every tool; autonomous dispatch remains policy- and authority-checked | LLM output correctness |
 | 4 providers routed in `buildApiHandler` | All 45 provider files active |
 | Typed tool enum + coordinator routing | Third-party MCP server behavior |
 | Completion gate pipeline on `attempt_completion` | Zero false-positive gate blocks |

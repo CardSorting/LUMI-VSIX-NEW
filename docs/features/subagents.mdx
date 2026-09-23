@@ -24,17 +24,17 @@ Subagent costs are tracked across every retry and rolled into the parent budget.
 
 ## Enabling Subagents
 
-Subagents are disabled by default. To turn them on:
+Subagents are enabled by default. To change the setting:
 
 1. Open LUMI Settings (click the gear icon in the LUMI panel)
 2. Go to **Features**
-3. Under the **Agent** section, toggle **Subagents** on
+3. Under the **Agent** section, turn **Subagents** on or off
 
 This setting applies in VS Code via extension state (`StateManager`).
 
 ## Using Subagents
 
-LUMI does not automatically decide to use subagents. You need to ask for them in your prompt. When the feature is enabled and you mention subagents (or describe a task that benefits from parallel exploration), LUMI will use the `use_subagents` tool.
+LUMI can decide to use subagents on its own when a task has substantial independent scopes and delegation will shorten the critical path. You can also request them directly. The agent keeps small or tightly coupled changes in the parent context and uses focused lanes for independent work.
 
 Example prompts:
 
@@ -49,11 +49,11 @@ Deep dive: [Working with subagents](/WORKING_WITH_SUBAGENTS) · Code map in [com
 
 ## Auto-Approve Behavior
 
-Launching a governed subagent batch requires one explicit approval decision recorded by `ExecutionFunnel`; it is not silently auto-approved. The launch intent records whether the proposed lanes declare mutation.
+The `ExecutionFunnel` records one launch decision for every governed subagent batch. In autonomous mode, the parent task can launch both research and in-scope mutation lanes without a second prompt. An omitted or unknown execution mode still defaults to mutation, which requires governed ownership and locks.
 
-Each child tool operation then enters the identical `ExecutionFunnel` authority under its own task generation and invocation. Read and edit settings may allow an eligible child operation to be approved automatically, but a child never reuses the launch decision or another invocation's permit.
+Each child tool operation then enters the identical `ExecutionFunnel` authority under its own task generation and invocation. In autonomous mode, child operations proceed without separate consent prompts; the child never reuses the launch decision or another invocation's permit.
 
-LUMI shows the proposed prompts when requesting launch consent. Tool allowlists, hooks, locks, budgets, replay fencing, and the merge gate remain enforced after approval.
+With autonomous mode off, launching a batch requires explicit consent. Tool allowlists, hooks, locks, budgets, replay fencing, and the merge gate remain enforced for every lane in either mode.
 
 ## What Subagents Can Do
 

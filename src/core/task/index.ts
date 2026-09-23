@@ -104,6 +104,7 @@ import * as path from "path"
 import { ulid } from "ulid"
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
+import { getEnabledPromptSkills } from "@core/context/instructions/user-instructions/skills"
 import { HostProvider } from "@/hosts/host-provider"
 import { orchestrator } from "@/infrastructure/ai/Orchestrator"
 import { getCoordinationRawDb } from "@/infrastructure/db/Config"
@@ -2539,6 +2540,20 @@ export class Task {
 		}
 
 		const providerInfo = this.getCurrentProviderInfo()
+		// Skill discovery is independent of host, rule, and workspace prompt setup.
+		// Start it now so those reads overlap; a broken optional skill folder should
+		// not prevent the core task prompt from being assembled.
+		const skillsPromise = getEnabledPromptSkills(
+			this.cwd,
+			this.stateManager.getGlobalSettingsKey("globalSkillsToggles") ?? {},
+			this.stateManager.getWorkspaceStateKey("localSkillsToggles") ?? {},
+		).catch((error: unknown) => {
+			Logger.warn(
+				`[Task ${this.taskId}] Skill discovery unavailable; continuing without the optional skill catalog:`,
+				error,
+			)
+			return []
+		})
 		const host = await HostProvider.env.getHostVersion({})
 		const ide = host?.platform || "Unknown"
 		const isCliEnvironment = host.dietcodeType === DietCodeClient.Cli
@@ -2602,8 +2617,13 @@ export class Task {
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
-		const openTabPaths = (await HostProvider.window.getOpenTabs({})).paths || []
-		const visibleTabPaths = (await HostProvider.window.getVisibleTabs({})).paths || []
+		const [skills, openTabs, visibleTabs] = await Promise.all([
+			skillsPromise,
+			HostProvider.window.getOpenTabs({}),
+			HostProvider.window.getVisibleTabs({}),
+		])
+		const openTabPaths = openTabs.paths || []
+		const visibleTabPaths = visibleTabs.paths || []
 		const cap = 50
 		const editorTabs = {
 			open: openTabPaths.slice(0, cap),
@@ -2643,6 +2663,7 @@ export class Task {
 			mode: (providerInfo.mode as "plan" | "act") || "act",
 			taskState: this.taskState,
 			goldenCartridgeAvailable,
+			skills,
 			environmentBlueprint,
 			modEnabled: this.stateManager.getGlobalSettingsKey("modEnabled") ?? false,
 		}
@@ -3330,26 +3351,34 @@ export class Task {
 			this.taskState.consecutiveMistakeCount >= this.stateManager.getGlobalSettingsKey("maxConsecutiveMistakes") &&
 			!isReady
 		) {
-			// Trigger the mistake limit approval gate so the user can intervene and help the agent
-			try {
-				const askResult = await this.ask(
-					"mistake_limit_reached",
-					`I have made ${this.taskState.consecutiveMistakeCount} consecutive mistakes (e.g. repeated errors or no tools used). Please help guide my next steps.`,
+			if (this.stateManager.getGlobalSettingsKey("yoloModeToggled")) {
+				// Keep the task moving in autonomous mode; the model can use the failure
+				// evidence already in the conversation to choose a different recovery path.
+				Logger.warn(
+					`[Task] Reached ${this.taskState.consecutiveMistakeCount} consecutive mistakes; continuing with autonomous recovery.`,
 				)
+			} else {
+				// In guided mode, let the user steer after repeated failures.
+				try {
+					const askResult = await this.ask(
+						"mistake_limit_reached",
+						`I have made ${this.taskState.consecutiveMistakeCount} consecutive mistakes (e.g. repeated errors or no tools used). Please help guide my next steps.`,
+					)
 
-				if (askResult.response === "messageResponse" && askResult.text) {
-					// Append user's typed feedback to the message log so the LLM receives it in the next request
-					await this.say("user_feedback", askResult.text, askResult.images, askResult.files)
-					await this.checkpointManager?.saveCheckpoint()
+					if (askResult.response === "messageResponse" && askResult.text) {
+						// Append user's typed feedback to the message log so the LLM receives it in the next request
+						await this.say("user_feedback", askResult.text, askResult.images, askResult.files)
+						await this.checkpointManager?.saveCheckpoint()
 
-					// Push it into the active userMessageContent so the task runner submits it in the next turn
-					this.taskState.userMessageContent.push({
-						type: "text",
-						text: askResult.text,
-					})
+						// Push it into the active userMessageContent so the task runner submits it in the next turn
+						this.taskState.userMessageContent.push({
+							type: "text",
+							text: askResult.text,
+						})
+					}
+				} catch (err) {
+					Logger.error(`[Task] Mistake limit ask failed: ${err}`)
 				}
-			} catch (err) {
-				Logger.error(`[Task] Mistake limit ask failed: ${err}`)
 			}
 
 			this.taskState.consecutiveMistakeCount = 0
@@ -4543,8 +4572,14 @@ export class Task {
 
 		// It could be useful for dietcode to know if the user went from one or no file to another between messages, so we always include this context
 		details += `\n\n# ${host.platform} Visible Files`
-		const rawVisiblePaths = (await HostProvider.window.getVisibleTabs({})).paths
-		const filteredVisiblePaths = await filterExistingFiles(rawVisiblePaths)
+		const [visibleTabs, openTabs] = await Promise.all([
+			HostProvider.window.getVisibleTabs({}),
+			HostProvider.window.getOpenTabs({}),
+		])
+		const [filteredVisiblePaths, filteredOpenTabPaths] = await Promise.all([
+			filterExistingFiles(visibleTabs.paths),
+			filterExistingFiles(openTabs.paths),
+		])
 		const visibleFilePaths = filteredVisiblePaths.map((absolutePath) => path.relative(this.cwd, absolutePath))
 
 		// Filter paths through dietcodeIgnoreController
@@ -4560,8 +4595,6 @@ export class Task {
 		}
 
 		details += `\n\n# ${host.platform} Open Tabs`
-		const rawOpenTabPaths = (await HostProvider.window.getOpenTabs({})).paths
-		const filteredOpenTabPaths = await filterExistingFiles(rawOpenTabPaths)
 		const openTabPaths = filteredOpenTabPaths.map((absolutePath) => path.relative(this.cwd, absolutePath))
 
 		// Filter paths through dietcodeIgnoreController

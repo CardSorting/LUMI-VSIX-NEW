@@ -12,8 +12,8 @@ LUMI has physical access to your workspace (files, terminal, browser, MCP). Secu
 
 | Layer | What it does | Where |
 |-------|--------------|-------|
-| **Tool approval** | Every operation receives one recorded approval decision before a permit can exist | `ExecutionFunnel` + webview projection |
-| **Auto-approve policy** | Eligible intents use current per-capability settings, command safety/permission, and MCP policy | `src/core/task/tools/execution/ExecutionFunnel.ts` |
+| **Execution admission** | Every operation receives one recorded execution decision before a permit can exist | `ExecutionFunnel` + webview projection |
+| **Autonomous mode** | In-scope operations proceed without per-tool consent prompts. Command permissions, hooks, workspace/lane authority, and MCP policy remain active | `src/core/task/tools/execution/ExecutionFunnel.ts` |
 | **Read-only allowlist** | 13 tools may run without blocking checkpoints | `READ_ONLY_TOOLS` in `src/shared/tools.ts` |
 | **Hooks** | Cancel or modify context at 8 lifecycle points | `src/core/hooks/hook-factory.ts` |
 | **Completion gates** | `attempt_completion` blocked until audit/roadmap/focus checks pass | `completionGatePipeline.ts` |
@@ -22,11 +22,11 @@ LUMI has physical access to your workspace (files, terminal, browser, MCP). Secu
 | **Credential storage** | API keys in VS Code secret storage | `StateManager` / `state-keys.ts` |
 | **Roadmap fail-closed** | Optional block when `ROADMAP.md` invalid | `lumi.roadmap.failClosedCompletionGates` |
 
-## Human-in-the-loop (default)
+## Consent boundaries
 
-LUMI cannot write files, run commands, browse, or call MCP tools without going through the tool execution pipeline and — unless auto-approve matches — **your explicit approval**.
+Every operation goes through the tool execution pipeline. Autonomous mode is enabled for new installations and removes per-tool consent prompts for agent-selected operations within the user's task scope. The funnel still applies execution policy, hooks, workspace and lane authority, cancellation, and lifecycle checks before dispatch. In-scope subagent delegation and child operations follow the same autonomous flow while lane allowlists, locks, budgets, and merge checks remain active. Turning autonomous mode off makes per-capability Auto Approve settings and handler eligibility authoritative for automatic execution.
 
-Read-only exploration (`read_file`, `search_files`, `web_fetch`, …) is designed to gather context without repeated prompts. **Mutation always earns scrutiny** unless you configure otherwise.
+Read-only exploration, routine workspace edits, verification, and in-scope command execution proceed without repeated prompts. `requires_approval=true` records command risk; in autonomous mode it does not pause execution. Skip actions outside the request or with unclear target/scope, and let command policy and hooks decide whether dispatch is allowed.
 
 See [Philosophy — Approval is the contract](papers/philosophy.md#iv-approval-is-the-contract).
 
@@ -65,9 +65,9 @@ Patterns work like `.gitignore`. See [dietcodeignore](customization/dietcodeigno
 
 Before **Approve**, use the built-in diff view (`VscodeDiffViewProvider`). The companion is calm, not invisible.
 
-### 3. Scope auto-approve narrowly
+### 3. Keep exceptional approval boundaries narrow
 
-Auto-approve is for trusted workflows (e.g. read-only research), not blanket YOLO. See [auto-approve](features/auto-approve.mdx).
+Autonomous mode covers routine, in-scope workspace work. Reserve explicit approval for high-impact or external side effects, and use command permissions or hooks when an organization needs a hard boundary. See [auto-approve](features/auto-approve.mdx).
 
 ### 4. Use hooks for org policy
 

@@ -16,7 +16,6 @@ import type { CompactionTier } from "@/core/context/context-management/ContextCo
 import { HostProvider } from "@/hosts/host-provider"
 import { setRoadmapConfigOverride } from "@/services/roadmap/RoadmapConfig"
 import { ApiFormat } from "@/shared/proto/dietcode/models"
-import { Logger } from "@/shared/services/Logger"
 import { DietCodeDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import { declareApprovalIntent } from "../../types/ToolContracts"

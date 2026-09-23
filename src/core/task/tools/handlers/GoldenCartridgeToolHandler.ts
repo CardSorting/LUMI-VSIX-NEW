@@ -66,6 +66,11 @@ const VERBS = new Set<GoldenCartridgeVerb>(Object.keys(SIDE_EFFECTS) as GoldenCa
 const asString = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value.trim() : undefined)
 const asStrings = (value: unknown): string[] =>
 	Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : []
+const requiresExplicitApproval = (payload: Payload): boolean => {
+	if (payload.requiresApproval === undefined) return false
+	if (payload.requiresApproval === false || asString(payload.requiresApproval)?.toLowerCase() === "false") return false
+	return true
+}
 const asEvidence = (value: unknown): GoldenCartridgeEvidence[] =>
 	Array.isArray(value)
 		? value.flatMap((item) => {
@@ -317,11 +322,12 @@ export class GoldenCartridgeToolHandler implements IToolHandler {
 			}
 		}
 		if (verb === "disprove" && payload.execute !== false) {
+			const requiresApproval = requiresExplicitApproval(payload)
 			requirements.push({
 				capability: "command",
-				risk: payload.requiresApproval === false ? "elevated" : "high",
+				risk: requiresApproval ? "high" : "elevated",
 				requestedSideEffects: ["execute delegated validation command"],
-				autoApprovalEligible: true,
+				autoApprovalEligible: !requiresApproval,
 			})
 		}
 		return declareApprovalIntent(block, {
@@ -977,7 +983,7 @@ export class GoldenCartridgeToolHandler implements IToolHandler {
 								suppliedCommands.includes(command) ? "caller" : undefined,
 							].filter(Boolean),
 							limitations: behaviorCheck ? [] : ["Static check may not exercise runtime behavior."],
-							approval_required: payload.requiresApproval !== false,
+							approval_required: requiresExplicitApproval(payload),
 						}
 					})
 					.sort((left, right) => {
@@ -1048,7 +1054,7 @@ export class GoldenCartridgeToolHandler implements IToolHandler {
 					parentBlock,
 					delegatedBlock(DietCodeDefaultTool.BASH, {
 						command: selected.command,
-						requires_approval: payload.requiresApproval === false ? "false" : "true",
+						requires_approval: requiresExplicitApproval(payload) ? "true" : "false",
 					}),
 					this.adapters.command,
 				)

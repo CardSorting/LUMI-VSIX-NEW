@@ -80,9 +80,13 @@ Provider handlers are in **`src/core/api/providers/`**, not `src/services/provid
 
 `HostProvider` decouples core logic from VS Code. The extension initializes it with VS Code–specific webview, diff, terminal, and gRPC bridge implementations. Core code calls `HostProvider.get()` instead of importing `vscode` directly.
 
-### Human-in-the-loop
+### Autonomous execution and consent
 
-Tools that mutate the workspace (`write_to_file`, `execute_command`, etc.) flow through approval UI in the webview. Read-only tools (`READ_ONLY_TOOLS` in `src/shared/tools.ts`) can run without blocking on checkpoint commits.
+All tools flow through `ExecutionFunnel`, which applies autonomous mode, current execution policy, hooks, and workspace/lane authority before dispatch. Autonomous mode removes per-tool consent prompts for in-scope operations; handler eligibility remains authoritative when autonomous mode is off. Read-only tools (`READ_ONLY_TOOLS` in `src/shared/tools.ts`) can run without blocking on checkpoint commits.
+
+### Skill loading
+
+Skills use progressive disclosure: the prompt includes bounded `name`/`description` metadata, and `use_skill` loads the full `SKILL.md` only when relevant. The agent can then load one linked text reference or script on demand, without pulling the whole skill directory into context. If the prompt catalog is truncated, a task query searches all enabled skills and loads an unambiguous match without asking the user to activate it. Disabled skills remain unavailable. Skill text is treated as untrusted workflow guidance, and any requested operations still pass through normal execution policy. This follows the [Agent Skills format](https://agentskills.io/specification) and OpenAI's [skills guidance](https://developers.openai.com/api/docs/guides/tools-skills).
 
 ### BroccoliDB integration
 

@@ -28,6 +28,7 @@ import { DietCodeDefaultTool, DietCodeTool } from "@shared/tools"
 import { v4 as uuidv4 } from "uuid"
 import type { CompactionTier, RecoverableContextReference } from "@/core/context/context-management/ContextCompactionTypes"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
+import { getEnabledPromptSkills } from "@core/context/instructions/user-instructions/skills"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
 import { getCompactionTierFromTokens, getContextWindowInfo } from "@/core/context/context-management/context-window-utils"
 import { orchestrator } from "@/infrastructure/ai/Orchestrator"
@@ -645,7 +646,12 @@ export class SubagentRunner {
 				ide: host?.platform || "Unknown",
 				focusChainSettings: this.baseConfig.focusChainSettings,
 				browserSettings: this.baseConfig.browserSettings,
-				yoloModeToggled: false,
+				skills: await getEnabledPromptSkills(
+					this.baseConfig.cwd,
+					this.baseConfig.services.stateManager.getGlobalSettingsKey("globalSkillsToggles") ?? {},
+					this.baseConfig.services.stateManager.getWorkspaceStateKey("localSkillsToggles") ?? {},
+				),
+				yoloModeToggled: true,
 				enableNativeToolCalls: nativeToolCallsRequested,
 				enableParallelToolCalling: shouldEnableParallelToolCallingForLane(
 					this.laneExecutionMode,
@@ -1439,12 +1445,9 @@ export class SubagentRunner {
 
 		toolResultBlocks.push({
 			type: "text",
-			text: `[SELF-CORRECTION NUDGE] You have called the same tool with the same parameters ${this.MAX_CONSECUTIVE_IDENTICAL_CALLS + 1} times in a row. This suggests you are stuck. Please RE-EVALUATE your approach, explore a different architectural layer, or use 'ask_followup_question' to clarify the objective with the parent.`,
+			text: `[SELF-CORRECTION NUDGE] You have called the same tool with the same parameters ${this.MAX_CONSECUTIVE_IDENTICAL_CALLS + 1} times in a row. Change approach: use a different query or an available tool/skill, and continue any independent work. Report an actual material blocker to the parent in your final result; do not wait for clarification on routine context.`,
 		})
 		Logger.warn(`[SubagentRunner] Repetition detected for tool ${toolName}; injected nudge.`)
-		void this.signalCriticalFindingsToSwarm(
-			`TOXIC HOTSPOT DETECTED: Subagent is stuck in a repetition loop with tool '${toolName}'. Potential architectural conflict or context uncertainty at this depth.`,
-		)
 		this.totalConsecutiveIdenticalCalls = 0
 	}
 
@@ -1815,8 +1818,6 @@ export class SubagentRunner {
 			"TOXIC HOTSPOT",
 			"SIGNAL: ARCHITECTURE_VIOLATION",
 			"SIGNAL: SECURITY_RISK",
-			"GROUNDED SPECIFICATION REFRESH",
-			"CONTEXT UNCERTAINTY",
 		]
 		const upperResult = result.toUpperCase()
 		const findingKey = this.hashString(upperResult).slice(0, 16)
@@ -1833,10 +1834,7 @@ export class SubagentRunner {
 
 			try {
 				const signalId = `${Date.now()}_${++this.signalSequence}`
-				const label =
-					upperResult.includes("GROUNDED SPECIFICATION REFRESH") || upperResult.includes("CONTEXT UNCERTAINTY")
-						? `swarm_nudge_${signalId}`
-						: `swarm_finding_${signalId}`
+				const label = `swarm_finding_${signalId}`
 				await orchestrator.storeMemory(parentStreamId, label, result.slice(0, 1500))
 				this.signaledFindings.add(findingKey)
 			} catch (e) {

@@ -137,7 +137,7 @@ describe("GoldenCartridgeToolHandler", () => {
 		assert.equal((adapters.condense as FakeHandler).calls.length, 1)
 		assert.equal((adapters.patch as FakeHandler).calls.length, 1)
 		assert.equal((adapters.command as FakeHandler).calls.length, 1)
-		assert.equal((adapters.command as FakeHandler).calls[0].params.requires_approval, "true")
+		assert.equal((adapters.command as FakeHandler).calls[0].params.requires_approval, "false")
 	})
 
 	it("keeps normal compression task-local and does not write durable memory", async () => {
@@ -296,7 +296,7 @@ describe("GoldenCartridgeToolHandler", () => {
 		assert.equal((envelope.result as any).passed, false)
 		assert.equal((envelope.result as any).validation_outcome.status, "failed")
 		assert.match((envelope.result as any).output_summary, /exit code 2/)
-		assert.equal((value.adapters.command as FakeHandler).calls[0].params.requires_approval, "true")
+		assert.equal((value.adapters.command as FakeHandler).calls[0].params.requires_approval, "false")
 	})
 
 	it("classifies canonical denial, timeout, signal, execution error, and missing evidence distinctly", async () => {

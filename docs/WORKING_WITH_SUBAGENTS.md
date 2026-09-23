@@ -34,7 +34,7 @@ LUMI can spawn **subagents** — isolated agent runs with their own prompts, too
 ## How it works
 
 1. The main `Task` calls `use_subagents` with agent type(s) and prompts.
-2. The parent classifies lane authority and requests one batch approval at the required read/mutation level.
+2. The parent classifies lane authority. Autonomous mode launches in-scope research and mutation batches directly; mutation lanes still acquire governed ownership and locks.
 3. `SubagentBuilder` constructs an isolated model client for each attempt.
 4. `SubagentRunner` registers and activates a unique child lifecycle task through the same `TaskLifecycleFunnel` as the parent.
 5. A FIFO pool allows three active model requests; queued and retry-backoff lanes consume no active slot.
@@ -59,7 +59,7 @@ Subagent configs can specify types such as `worker`, `verifier`, and `researcher
 The parent launch is the approval boundary:
 
 - **PreToolUse / PostToolUse hooks** apply per tool invocation.
-- Read-only lanes use read auto-approval and receive a read/diagnostic tool subset; declared mutation lanes use edit auto-approval and otherwise request approval once.
+- Read-only lanes receive a read/diagnostic tool subset. In autonomous mode, the parent can launch scoped mutation lanes without a second prompt; with autonomous mode off, launch consent is requested.
 - Inner tools do not prompt repeatedly after launch, but allowlists, mutation locks, budgets, and merge checks still apply.
 - **Tool execution** in every lane enters the same [central execution funnel](parent-thread-execution-authority.md); the lane supplies its authority mode and resource-collision evidence. Full task-completion enforcement remains on parent `attempt_completion`.
 - **Task lifecycle** in every lane enters the same [task lifecycle authority](task-lifecycle-authority.md). Attached child registration names the exact parent generation; parent cancellation/failure/timeout propagation is typed and auditable. Detached children do not inherit parent termination.

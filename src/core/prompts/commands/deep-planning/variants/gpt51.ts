@@ -26,9 +26,8 @@ export function createGPT51Variant(): DeepPlanningVariant {
 /**
  * Generates the deep-planning template with shell-specific commands
  * @param focusChainEnabled Whether focus chain (task_progress) is enabled for this task
- * @param enableNativeToolCalls Whether native tool calling is enabled
  */
-export function generateGPT51Template(focusChainEnabled: boolean, enableNativeToolCalls: boolean): string {
+export function generateGPT51Template(focusChainEnabled: boolean): string {
 	const detectedShell = getShell()
 
 	let isPowerShell = false
@@ -40,18 +39,18 @@ export function generateGPT51Template(focusChainEnabled: boolean, enableNativeTo
 	} catch {}
 
 	return `<explicit_instructions type="deep-planning">
-Your task is to create a comprehensive implementation plan before writing any code. This process has five distinct steps that must be completed in order:
+Investigate the requested change thoroughly, create a grounded implementation plan, and continue directly into implementation after the automatic Plan-to-Act transition. Keep the sequence dependency-aware and batch independent research:
 1. Map the project
 2. Check the facts
 3. Discuss choices
 4. Create the implementation plan document
-5. Create new_task for the build phase
+5. Automatically transition to ACT and implement the plan in the current task
 
-${focusChainEnabled ? `You should track these five steps in your task_progress parameter, and update it only when steps are completed.` : ""}
+${focusChainEnabled ? `Track focused research, planning, and implementation progress; update the checklist when the task state changes.` : ""}
 Your behavior should be methodical and thorough - take time to understand the codebase completely before making any recommendations. The quality of your investigation and use of targeted reads/searches directly impacts the success of the implementation.
 
 <IMPORTANT>
-Execute only exploration and plan generation steps until explicitly instructed by the user to proceed with coding.
+Complete the plan, then follow the system's automatic ACT transition and continue implementation without another approval or proceed message.
 You must thoroughly understand the existing codebase before proposing any changes.
 Perform your research without commentary or narration. Execute commands and read files without explaining what you're about to do. Only speak up if you have specific questions for the user.
 </IMPORTANT>
@@ -120,167 +119,31 @@ grep -r "TODO\\|FIXME\\|XXX\\|HACK\\|NOTE" --include="*.py" --include="*.js" --i
 
 ## STEP 3: Discussion and Questions
 
-Ask the user brief, targeted questions that will influence your implementation plan. Keep your questions concise and conversational. Ask only essential questions needed to create an accurate plan.
-
-**Ask questions only when necessary for:**
-- Clarifying ambiguous requirements or unclear specifications
-- Choosing between multiple equally valid implementation approaches that have significant trade-offs
-- Confirming non-trivial assumptions about existing system behavior or constraints
-- Understanding preferences for specific technical decisions that will affect the final implementation's behavior or code maintainability
-
-Your questions should be direct and specific. Avoid long explanations or multiple questions in one response. Only ask one question at a time. You may ask several questions if required and within scope of the task.
+Resolve uncertainties from repository evidence, prior context, relevant skills, and reversible defaults. Ask one focused question only when a critical choice cannot be inferred and would materially change scope or safety. Continue independent research and finish the plan while any dependent detail remains unresolved; implement after the automatic ACT transition. Never ask the user to approve the plan.
 
 ## STEP 4: Create Implementation Plan Document
 
-### Grounded review
-Before finalizing your plan, you must follow the **Double Down Planning** workflow:
-1. **Draft**: Use \`scratchpad.md\` for your investigation. You MUST follow the **Sovereign Triad V8 Template** (Grounding Probes -> Hazard Analysis -> Resolution).
-2. **Grounded Audit**: Answer the three investigative probes (Boundary, Assumption, Atomic) in the scratchpad.
-3. **Risk analysis**: Explicitly list any risk areas found in Step 1 (high-impact files, hotspots, ambiguous symbols, or cleanup/debt areas) and explain how your plan mitigates them.
-4. **Stale-map and impact check**: Verify mapped files still exist, forecast conflicts where available, and use \`npx tsx scripts/agent-spider.ts blast-radius\` when impact needs quantifying.
-5. **Draft Resolution**: Synthesize all hardening results into the formal \`implementation_plan.md\`.
-6. **User Presentation**: Use the \`plan_mode_respond\` tool as your VERY NEXT action to deliver the finalized plan. The system will automatically transition to ACT MODE for implementation.
+### Evidence-based review
+Trace the requested behavior through relevant entry points, dependencies, policy boundaries, and existing verification. Use temporary notes only when helpful; do not create a scratchpad or run broad scans by default. Check assumptions against source and record concrete risks with mitigations. Save the concise plan, call plan_mode_respond once, then continue after the automatic ACT transition.
 
 Once you have obtained sufficient context to understand all code modifications that will be required, create a structured markdown document containing your complete implementation plan. The document must follow this exact format with clearly marked sections:
 
-### Document Structure Requirements
+### Plan format
+Save implementation_plan.md at the workspace root. Keep it proportional to the task and include only applicable details:
+- Goal and scope
+- Findings and existing patterns
+- Proposed changes and affected files
+- Dependencies and implementation sequence
+- Validation strategy
+- Risks, assumptions, and recovery
+Omit placeholders and sections that do not apply.
 
-Your implementation plan must be saved as implementation_plan.md, and *must* be structured as follows:
+## Continue Into Implementation
+Save implementation_plan.md at the workspace root using the concise plan format above. Use temporary notes only when helpful.
 
-<example_implementation_plan>
-# Implementation Plan
+Do not create a new_task; it presents a user confirmation preview and interrupts this task. Call plan_mode_respond once with a concise summary. The system transitions to ACT MODE automatically; continue implementation in this task without waiting for another approval or proceed message.
 
-[Project Map]
-Starting point, connected files, risk areas, verified facts, and confidence in plain language.
-
-[Recommended Approach]
-The preferred path forward and why it balances safety, scope, and maintainability.
-
-[Choices]
-Any meaningful alternatives, such as minimal fix, recommended approach, or larger cleanup/refactor.
-
-[Overview]
-Single sentence describing the overall goal.
-
-Multiple paragraphs outlining the scope, context, and high-level approach. Explain why this implementation is needed and how it fits into the existing system.
-
-[Types]  
-Single sentence describing the type system changes.
-
-Detailed type definitions, interfaces, enums, or data structures with complete specifications. Include field names, types, validation rules, and relationships.
-
-[Files]
-Single sentence describing file modifications.
-
-Detailed breakdown:
-- New files to be created (with full paths and purpose)
-- Existing files to be modified (with specific changes)  
-- Files to be deleted or moved
-- Configuration file updates
-
-[Functions]
-Single sentence describing function modifications.
-
-Detailed breakdown:
-- New functions (name, signature, file path, purpose)
-- Modified functions (exact name, current file path, required changes)
-- Removed functions (name, file path, reason, migration strategy)
-
-[Classes]
-Single sentence describing class modifications.
-
-Detailed breakdown:
-- New classes (name, file path, key methods, inheritance)
-- Modified classes (exact name, file path, specific modifications)
-- Removed classes (name, file path, replacement strategy)
-
-[Dependencies]
-Single sentence describing dependency modifications.
-
-Details of new packages, version changes, and integration requirements.
-
-[Implementation Order]
-Single sentence describing the implementation sequence.
-
-Numbered steps showing the logical order of changes to minimize conflicts and ensure successful integration.
-${focusChainEnabled ? "A task_progress list of steps that will need to be completed during the implementation" : ""}
-
-</example_implementation_plan>
-
-## STEP 5: Create Implementation new_task
-
-Use the new_task command to create a task for implementing the plan. ${focusChainEnabled ? "The task must include a <task_progress> list that breaks down the implementation into trackable steps." : ""}
-
-### Task Creation Requirements
-
-<IMPORTANT>
-**Standalone Product:**
-Your new task should be self-contained and reference the plan document rather than requiring additional codebase investigation. Include these specific instructions in the task description:
-
-${
-	focusChainEnabled
-		? `**Task Progress Format:**
-You absolutely MUST include the task_progress contents in context when creating the new task. When providing it, do not wrap it in XML tags- instead provide it like this:
-
-task_progress Items:
-- [ ] Step 1: Brief description of first implementation step
-- [ ] Step 2: Brief description of second implementation step  
-- [ ] Step 3: Brief description of third implementation step
-- [ ] Step N: Brief description of subsequent/final implementation step(s)
-
-**Markdown Implementation Plan Path:**
-You also MUST include the path to the markdown file you have created in your new task prompt. You should do this as follows:
-  Refer to @path/to/file/markdown.md for a complete breakdown of the task requirements and steps. You should periodically read this file again.`
-		: ""
-}
-</IMPORTANT>
-
-${
-	enableNativeToolCalls
-		? `**new_task Tool Definition:**
-
-When you are ready to create the implementation task, you must call the new_task tool with the following structure:
-
-{
-  "name": "new_task",
-  "arguments": {
-    "context": "Your detailed context here following the 5-point structure..."
-  }
-}
-
-The context parameter should include all five sections as described above.
-
-`
-		: `**new_task Tool Definition:**
-
-When you are ready to create the implementation task, you must call the new_task tool with the following structure:
-
-<new_task>
-<context>Your detailed context here following the 5-point structure...</context>
-</new_task>
-
-The context parameter should include all five sections as described above.
-
-`
-}
-
-### Mode Switching
-
-<IMPORTANT>
-The system automatically manages plan and act mode. New tasks begin in PLAN MODE. When the implementation task starts, call plan_mode_respond with a brief summary referencing your spec document; the system will automatically transition to ACT MODE for implementation.
-</IMPORTANT>
-
-## Quality Standards
-
-You must be specific with exact file paths, function names, and class names. You must be comprehensive and avoid assuming implicit understanding. You must be practical and consider real-world constraints and edge cases. You must use precise technical language and avoid ambiguity.
-
-Your implementation plan should be detailed enough that another developer could execute it without additional investigation.
-
----
-
-**Execute all five steps in sequence. Your role is to plan thoroughly, not to implement. Code creation begins only after the new task is created and you receive explicit instruction to proceed.**
-
-Below is the user's input from when they indicated that they wanted to create this comprehensive implementation plan.
+Use relevant enabled skills automatically. Batch independent reads, searches, checks, and tool calls when supported; sequence only dependent actions. Resolve uncertainty from evidence and reversible defaults. Ask only when a critical scope or safety decision cannot be inferred. When an operation fails, inspect its result, change tactics, and keep independent work moving.
 </explicit_instructions>
 `
 }

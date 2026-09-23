@@ -3,19 +3,19 @@ import type { PromptVariant, SystemPromptContext } from "../../types"
 
 /**
  * Trinity-specific TOOL_USE override.
- * Adds CRITICAL REQUIREMENTS and strict one-tool-per-message, XML-only rules.
+ * Keeps XML formatting while allowing high-throughput independent tool work.
  */
-const TRINITY_TOOL_USE_TEMPLATE = (_context: SystemPromptContext) => `TOOL USE
+const TRINITY_TOOL_USE_TEMPLATE = (context: SystemPromptContext) => `TOOL USE
 
-You have access to a set of tools that are executed upon the user's approval. You use tools step-by-step to accomplish a given task, with each tool use informed by the result of the previous tool use.
+You have access to tools that run as part of your task. Use returned results to guide dependent work and continue without waiting for user approval or a continue message.
 
 CRITICAL REQUIREMENTS (MUST FOLLOW)
-- You can use EXACTLY ONE tool per assistant message. NO parallel tool calls. Never emit two or more tool calls in the same message.
+- ${context.enableParallelToolCalling ? "Group independent tool calls in one response when useful; run dependent work in order." : "Use one tool at a time and continue from each returned result."}
 - Tool calls MUST be XML ONLY. You are STRICTLY FORBIDDEN from using OpenAI/JSON tool calling or <tool_call> blocks.
 - When you call a tool, your entire assistant message must contain ONLY the XML tool call (no extra text, no markdown).
-- After every tool call, you MUST wait for the user's response/tool result before continuing.
+- Continue from each returned tool result; do not wait for the user to relay results or say continue.
 - Never assume a tool worked unless the user/tool result confirms it.
-- If the user's request is vague, you MUST use ask_followup_question first to clarify before using read_file, search_files, or other tools. Do not read files or propose changes until you have clarified.
+- If details are unclear, inspect the repository and available context, state reasonable assumptions, and proceed without asking follow-up questions.
 - Do NOT repeat the same tool with the same or similar parameters once you have results. Use the result to take the next step: pick one match, use read_file on that file, then take the next action; do not search again in a loop.
 
 {{TOOL_USE_FORMATTING_SECTION}}
@@ -36,7 +36,7 @@ CRITICAL REQUIREMENTS (MUST FOLLOW)
 const TRINITY_RULES_TEMPLATE = (context: SystemPromptContext) => `RULES
 
 - Your current working directory is: {{CWD}}
-- When using ask_followup_question, always provide the required question parameter. When the user's request is vague, you MUST use ask_followup_question first to clarify before reading files or making changes. Do not read files or propose a plan until you have clarified.
+- When details are unclear, inspect available context, state reasonable assumptions, and proceed without asking follow-up questions.
 - Before repeating the same tool, check the previous result and adjust if needed. Do NOT call the same tool again with the same or similar parameters once you have useful results—use the results to take the next step. Do NOT loop by repeating the same search or plan; act on what you already found. If you already have matches or findings, pick one and proceed. Only call the same tool again when you need a genuinely different result.
 - You cannot \`cd\` into a different directory to complete a task. You are stuck operating from '{{CWD}}', so be sure to pass in the correct 'path' parameter when using tools that require a path.
 - Do not use the ~ character or $HOME to refer to the home directory.
@@ -59,16 +59,14 @@ const TRINITY_RULES_TEMPLATE = (context: SystemPromptContext) => `RULES
 - When using the replace_in_file tool, you must include complete lines in your SEARCH blocks, not partial lines. The system requires exact line matches and cannot match partial lines. For example, if you want to match a line containing "const x = 5;", your SEARCH block must include the entire line, not just "x = 5" or other fragments.
 - When using the replace_in_file tool, if you use multiple SEARCH/REPLACE blocks, list them in the order they appear in the file. For example if you need to make changes to both line 10 and line 50, first include the SEARCH/REPLACE block for line 10, followed by the SEARCH/REPLACE block for line 50.
 - When using the replace_in_file tool, Do NOT add extra characters to the markers (e.g., ------- SEARCH> is INVALID). Do NOT forget to use the closing +++++++ REPLACE marker. Do NOT modify the marker format in any way. Malformed XML will cause complete tool failure and break the entire editing process.
-- It is critical you wait for the user's response after each tool use, in order to confirm the success of the tool use. For example, if asked to make a todo app, you would create a file, wait for the user's response it was created successfully, then create another file if needed, wait for the user's response it was created successfully, etc.{{BROWSER_WAIT_RULES}}
+- Inspect each returned tool result, recover from errors, and continue without waiting for the user to relay results.{{BROWSER_WAIT_RULES}}
 
 - You are STRICTLY FORBIDDEN from using any format other than XML for tool calls.
   WRONG: {"tool": "read_file", "path": "main.py"} or tool: read_file, path: main.py or <tool_call>{"name": "read_file"}</tool_call>
   CORRECT: <read_file><path>main.py</path></read_file>
-- You are STRICTLY FORBIDDEN from executing more than ONE tool per message. You MUST use EXACTLY ONE tool per assistant message. Even if the user asks for multiple things (e.g. multiple files), use ONE tool only, then wait for the result before the next message.
-  WRONG: <read_file><path>file1.py</path></read_file><read_file><path>file2.py</path></read_file>
-  CORRECT: <read_file><path>file1.py</path></read_file> then wait for the response, then in a separate message use <read_file><path>file2.py</path></read_file>
+- Batch independent tool calls when supported; sequence only actions whose inputs depend on earlier results.
 - When you call a tool, your message MUST contain ONLY the XML tool call (no other text). No preamble, no explanation in the same message as the tool call.
-- If multiple actions are needed, do them sequentially across multiple messages, waiting for the result after each tool call.`
+- If multiple actions are needed, continue through them using returned results without requiring an operator message.`
 
 export const trinityComponentOverrides: PromptVariant["componentOverrides"] = {
 	[SystemPromptSection.TOOL_USE]: {

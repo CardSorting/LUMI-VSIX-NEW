@@ -52,6 +52,9 @@ export const IO_AUTHORITY_TOOLS = new Set<DietCodeDefaultTool>([
 	DietCodeDefaultTool.LIST_FILES,
 	DietCodeDefaultTool.SEARCH,
 	DietCodeDefaultTool.LIST_CODE_DEF,
+	DietCodeDefaultTool.PROJECT_MAP,
+	DietCodeDefaultTool.USE_SKILL,
+	DietCodeDefaultTool.STABILITY_QUERY,
 	DietCodeDefaultTool.STABILITY_DIAGNOSE,
 ])
 
@@ -1214,6 +1217,20 @@ export class ExecutionFunnel {
 	): Promise<ExecutionFunnelOutcome | undefined> {
 		const intent = decision.approvalIntent
 		if (!intent) throw new Error("Approval intent was not prepared.")
+		if (intent.requirements.length === 0) {
+			decision.stages.push(na("approval.settings", "No approval settings are needed for this operation"))
+			decision.stages.push(na("approval.automatic", "The declared operation requires no user consent"))
+			decision.stages.push(na("approval.prompt", "No prompt was required"))
+			this.recordApprovalDecision(decision, {
+				status: "approved",
+				actor: "execution_policy",
+				mechanism: "not_required",
+				reason: "The operation's pure intent declared no consent-requiring capabilities.",
+				prompted: false,
+			})
+			return undefined
+		}
+
 		let policyInputs: ApprovalPolicyInputs
 		try {
 			policyInputs = this.evaluateApprovalPolicy(decision.config, intent)
@@ -1241,27 +1258,24 @@ export class ExecutionFunnel {
 			),
 		)
 
-		if (intent.requirements.length === 0) {
-			decision.stages.push(na("approval.automatic", "The declared operation requires no user consent"))
-			decision.stages.push(na("approval.prompt", "No prompt was required"))
-			this.recordApprovalDecision(decision, {
-				status: "approved",
-				actor: "execution_policy",
-				mechanism: "not_required",
-				reason: "The operation's pure intent declared no consent-requiring capabilities.",
-				prompted: false,
-			})
-			return undefined
-		}
-
 		if (policyInputs.automaticApprovalAllowed) {
-			decision.stages.push(pass("approval.automatic", "Automatic approval policy admitted every requirement"))
+			decision.stages.push(
+				pass(
+					"approval.automatic",
+					decision.config.yoloModeToggled === true
+						? "Autonomous mode admitted every declared requirement"
+						: "Automatic approval policy admitted every requirement",
+				),
+			)
 			decision.stages.push(na("approval.prompt", "Automatic approval made an explicit prompt unnecessary"))
 			this.recordApprovalDecision(decision, {
 				status: "approved",
 				actor: "automatic_policy",
 				mechanism: "automatic",
-				reason: "All declared capabilities were enabled by current approval settings and policy.",
+				reason:
+					decision.config.yoloModeToggled === true
+						? "Autonomous mode admitted the declared operation without an interactive consent prompt."
+						: "All declared capabilities were enabled by current approval settings and policy.",
 				prompted: false,
 			})
 			await this.projectAutomaticApproval(decision)
@@ -1285,7 +1299,7 @@ export class ExecutionFunnel {
 		}
 
 		if (intent.prompt.notification) {
-			showNotificationForApproval(intent.prompt.notification, decision.config.autoApprovalSettings.enableNotifications)
+			showNotificationForApproval(intent.prompt.notification, decision.config.autoApprovalSettings?.enableNotifications === true)
 		}
 		decision.stages.push(pass("approval.prompt", "Explicit user consent was requested", { prompted: true }))
 		try {
@@ -1356,20 +1370,27 @@ export class ExecutionFunnel {
 	}
 
 	private evaluateApprovalPolicy(config: TaskConfig, intent: RecordedApprovalIntent): ApprovalPolicyInputs {
-		const settings = config.autoApprovalSettings
-		if (
-			!settings ||
-			!Number.isInteger(settings.version) ||
-			settings.version < 1 ||
-			!settings.actions ||
-			typeof settings.enableNotifications !== "boolean"
-		) {
+		const settings = config.autoApprovalSettings as
+			| { version?: unknown; actions?: Record<string, unknown>; enableNotifications?: unknown }
+			| undefined
+		const autonomousMode = config.yoloModeToggled === true
+		const settingsShapeValid =
+			!!settings &&
+			Number.isInteger(settings.version) &&
+			(settings.version as number) >= 1 &&
+			!!settings.actions &&
+			typeof settings.actions === "object" &&
+			typeof settings.enableNotifications === "boolean"
+		if (!settingsShapeValid && !autonomousMode) {
 			throw new Error("Approval settings are absent or malformed; execution failed closed.")
 		}
 		const action = (name: keyof ApprovalPolicyInputs["actions"]): boolean => {
-			const value = settings.actions[name as keyof typeof settings.actions]
+			const value = settings?.actions?.[name]
 			if (value === undefined) return false
-			if (typeof value !== "boolean") throw new Error(`Approval setting '${name}' is malformed; execution failed closed.`)
+			if (typeof value !== "boolean") {
+				if (autonomousMode) return false
+				throw new Error(`Approval setting '${name}' is malformed; execution failed closed.`)
+			}
 			return value
 		}
 		const actions: ApprovalPolicyInputs["actions"] = {
@@ -1386,9 +1407,14 @@ export class ExecutionFunnel {
 		const commandSafetyTiers = commands.map((command) => classifyCommand(command).tier)
 		const trustedCommandMatched = commands.length > 0 && commands.every((command) => this.isTrustedCommand(config, command))
 		const mcpToolSettingMatched = this.isMcpToolAutoApproved(config, intent)
+		// Autonomous mode is the user's standing authority for agent-selected
+		// operations. Handler eligibility remains authoritative when autonomous
+		// mode is off; in autonomous mode it is retained as audit metadata rather
+		// than an interactive consent gate.
 		const automaticApprovalConsidered =
-			intent.requirements.length > 0 && intent.requirements.every((requirement) => requirement.autoApprovalEligible)
-		const automaticApprovalAllowed =
+			intent.requirements.length > 0 &&
+			(autonomousMode || intent.requirements.every((requirement) => requirement.autoApprovalEligible))
+		const configuredAutomaticApprovalAllowed =
 			automaticApprovalConsidered &&
 			intent.requirements.every((requirement) => {
 				switch (requirement.capability) {
@@ -1435,8 +1461,12 @@ export class ExecutionFunnel {
 						return false
 				}
 			})
+		// Autonomous mode removes per-operation consent prompts. Operation policy,
+		// hooks, workspace/lane authority, and lifecycle checks still run before dispatch.
+		const automaticApprovalAllowed = automaticApprovalConsidered && (autonomousMode || configuredAutomaticApprovalAllowed)
 		return {
-			settingsVersion: settings.version,
+			settingsVersion:
+				Number.isInteger(settings?.version) && (settings.version as number) >= 1 ? (settings.version as number) : 0,
 			actions,
 			trustedCommandMatched,
 			commandSafetyTiers,

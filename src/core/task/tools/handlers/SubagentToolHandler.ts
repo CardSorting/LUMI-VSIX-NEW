@@ -227,7 +227,9 @@ export class UseSubagentsToolHandler implements IToolHandler, IPartialBlockHandl
 					capability: "subagent",
 					risk: mutating ? "high" : "elevated",
 					requestedSideEffects: [mutating ? "delegate workspace mutation" : "delegate governed execution"],
-					autoApprovalEligible: false,
+					// The user authorized the task at the parent. Lane mode, write sets,
+					// locks, hooks, and each child tool's own policy remain in force.
+					autoApprovalEligible: true,
 				},
 			],
 			promptType: "use_subagents",

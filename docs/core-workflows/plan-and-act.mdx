@@ -26,8 +26,8 @@ In **LUMI Settings → API Configuration**, use the **Plan** and **Act** tabs (`
 1. User describes a goal.
 2. Agent gathers context with read-only tools (search, read files, project map).
 3. In Plan mode, agent responds with `plan_mode_respond` — strategy without writes.
-4. User approves direction or sends follow-ups; agent transitions to Act mode.
-5. In Act mode, agent uses mutating tools; each requires approval unless auto-approve matches.
+4. The agent transitions to Act when the plan is ready; the user can steer or refine it at any point.
+5. In autonomous Act mode, the agent executes in-scope operations without per-tool approval. Policy, hooks, workspace/lane authority, cancellation, and lifecycle checks continue to govern dispatch.
 6. Agent finishes with `attempt_completion` (subject to roadmap and audit gates when enabled).
 
 ## Replanning
@@ -37,7 +37,7 @@ In **LUMI Settings → API Configuration**, use the **Plan** and **Act** tabs (`
 
 ## Auto-approve / YOLO
 
-`ExecutionFunnel` can record automatic approval when the operation's pure intent is eligible and current settings plus execution policy admit every declared capability. Otherwise it prompts and records the explicit decision before issuing a permit. Enterprise docs may refer to broad automation settings as "YOLO mode" — see [auto-approve](/features/auto-approve).
+In autonomous mode, `ExecutionFunnel` proceeds with in-scope operations without per-tool consent prompts. Execution policy, hooks, workspace/lane authority, cancellation, and lifecycle checks still apply before a permit is issued. With autonomous mode off, Auto Approve settings and handler eligibility govern automatic execution. See [auto-approve](/features/auto-approve).
 
 ## Related
 

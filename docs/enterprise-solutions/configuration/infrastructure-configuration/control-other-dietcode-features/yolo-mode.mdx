@@ -4,7 +4,7 @@ sidebarTitle: "YOLO Mode"
 description: "Enterprise controls for YOLO Mode autonomous operation"
 ---
 
-YOLO Mode enables LUMI to operate with complete autonomy, auto-approving all actions without user confirmation. For Enterprise administrators, this page covers how to control access to YOLO Mode across your organization.
+YOLO Mode lets LUMI execute agent-selected operations without per-tool consent prompts. Execution hooks, operation policy, workspace and lane authority, and lifecycle checks remain active. For Enterprise administrators, this page covers how to control access to YOLO Mode across your organization.
 
 <Note>
 For complete details about YOLO Mode functionality, risks, and best practices, see [YOLO Mode in Features](/features/yolo-mode).
@@ -12,7 +12,7 @@ For complete details about YOLO Mode functionality, risks, and best practices, s
 
 ## Overview
 
-When YOLO Mode is enabled, LUMI automatically approves all operations including file changes, terminal commands, browser actions, and mode transitions. This provides maximum automation speed but removes all safety guardrails.
+When YOLO Mode is enabled, file changes, terminal commands, browser actions, and delegated work proceed without a per-tool consent prompt. Consent declarations remain in the audit record; execution hooks, workspace fencing, command policy, and completion checks remain active.
 
 <Warning>
 YOLO Mode is powerful but potentially dangerous. Administrators should carefully consider which teams or users should have access to this feature.
@@ -59,7 +59,7 @@ Most organizations should **disable YOLO Mode by default** for the following rea
 
 <AccordionGroup>
   <Accordion title="Security & Compliance" icon="shield">
-    YOLO Mode removes all approval gates, potentially allowing:
+    YOLO Mode can run eligible operations without a per-tool prompt, which can allow:
     - Unreviewed code changes to critical systems
     - Execution of commands without oversight
     - Automated actions that may violate compliance policies
@@ -70,7 +70,7 @@ Most organizations should **disable YOLO Mode by default** for the following rea
     Without approval prompts:
     - Changes happen too quickly to review in real-time
     - Mistakes can compound before detection
-    - Quality gates are bypassed
+    - Human review may happen after eligible changes have run; task completion gates remain active
     - Rollback becomes more complex
   </Accordion>
   
@@ -110,10 +110,10 @@ Consider enabling YOLO Mode for:
 When YOLO Mode is enabled in your organization:
 
 **Risk Factors:**
-- All tool executions happen automatically without human review
+- Eligible operations can run without a per-tool prompt; handler-declared consent requirements still pause for review
 - Potential for rapid propagation of mistakes across multiple files
-- Reduced opportunity to catch security vulnerabilities before implementation
-- Automated operations may bypass existing security controls
+- Review may happen after an eligible change is applied rather than before it
+- Autonomous execution does not replace organization-specific command policies, hooks, or access controls
 
 **Mitigations:**
 - Implement comprehensive logging and monitoring

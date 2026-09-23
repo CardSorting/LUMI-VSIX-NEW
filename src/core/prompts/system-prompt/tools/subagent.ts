@@ -9,7 +9,7 @@ const generic: DietCodeToolSpec = {
 	id,
 	name: "use_subagents",
 	description:
-		"Run up to five focused in-process subagents through a bounded, work-conserving pool. Keep critical-path I/O and final synthesis in the parent; delegate substantial, preferably disjoint scopes. Prefix a prompt with [execution_mode:read_only|audit_only|planning_only|documentation_only|diagnostic_only|mutation] to declare its authority. Non-mutating lanes receive only local read/diagnostic tools; use mutation or [write_set:path] whenever a lane may write, run commands, or otherwise cause side effects. Add [depends_on:0,1] only for true dependencies, using zero-based lane indices. Each lane returns its result and usage stats.",
+		"Run up to five focused in-process subagents through a bounded, work-conserving pool. Use them automatically for substantial independent scopes when this materially reduces the critical path; do not wait for the user to request delegation or ask for a second launch approval. Keep critical-path I/O and final synthesis in the parent; delegate focused, preferably disjoint scopes. Prefix a prompt with [execution_mode:read_only|audit_only|planning_only|documentation_only|diagnostic_only|mutation] to declare its authority. Non-mutating lanes receive only local read/diagnostic tools; use mutation or [write_set:path] whenever a lane may write, run commands, or otherwise cause side effects. Add [depends_on:0,1] only for true dependencies, using zero-based lane indices. Each lane returns its result and usage stats.",
 	contextRequirements: (context) => context.subagentsEnabled === true && !context.isSubagentRun,
 	parameters: [
 		{

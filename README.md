@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>A calm coding companion — human-in-the-loop agentic pair programming inside VS Code.</strong>
+  <strong>A calm coding companion — autonomous workspace work with consent for protected actions.</strong>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
   <img src="assets/docs/demo.gif" alt="LUMI demo — chat, approval, and file edits in VS Code" width="720" />
 </p>
 
-> **Human-in-the-loop by default:** diff before write, checkpoint after tool use, completion gates before “done.”
+> **Autonomous execution:** agent-selected operations proceed without per-tool approval prompts; policy, hooks, workspace authority, checkpoints, and completion checks remain active.
 
 ```bash
 # VS Code Marketplace (CardSorting.lumi-vscode)
@@ -80,7 +80,7 @@ code --install-extension CardSorting.lumi
 
 ## About
 
-**LUMI** is a VS Code extension that reads your workspace, plans changes, runs terminal commands, connects MCP servers, and edits files — with **explicit approval at every mutating step**.
+**LUMI** is a VS Code extension that reads your workspace, plans changes, runs terminal commands, connects MCP servers, and edits files — autonomously within the task scope, with policy, hooks, workspace authority, and recovery checks applied throughout.
 
 | | |
 |---|---|
@@ -223,7 +223,7 @@ Thank you to the Cline maintainers and contributors for the foundation this proj
 
 ## Features
 
-- **Approval gates** — diff before write; you control when mutating tools run
+- **Autonomous execution** — in-scope tool calls proceed without per-operation approval prompts; execution policy and hooks remain active
 - **Plan before Act** — `plan_mode_respond` for exploration; `act_mode_respond` for implementation
 - **64 typed tools** — dedicated handlers instead of ad-hoc shell access
 - **Checkpoints** — shadow Git rollback after each tool use
@@ -281,8 +281,8 @@ flowchart LR
 
 1. **Open LUMI**: Click the LUMI icon in the VS Code Activity Bar.
 2. **Configure Provider**: Go to **LUMI Settings → API Configuration** and set up your preferred model provider (OpenRouter, ChatGPT Subscription, NousResearch, Cloudflare, etc.).
-3. **Plan Before Acting**: Start with **Plan Mode** (`plan_mode_respond`) to explore codebases, analyze architecture, and formulate plans safely before making changes.
-4. **Human-in-the-Loop Approval**: Switch to **Act Mode** (`act_mode_respond`) to execute file edits and terminal commands. Review exact diffs and tool parameters before approving.
+3. **Choose a working mode**: New installations start in autonomous Act mode. Turn off **YOLO Mode** to begin with read-only Plan mode and steer the implementation.
+4. **Review the work**: Tool calls proceed without per-operation approval prompts in autonomous Act mode. Review workspace diffs and checkpoints when useful; policy and configured hooks continue to govern execution.
 5. **Zero-Config Context Scaling**: As sessions accumulate tool output, **BroccoliDB Context Compaction** silently compacts prompt projections into sharded CAS blobs without interrupting execution or losing exact historical source bytes.
 6. **One-Click Checkpoints**: Keep checkpoints enabled to rollback to any state after tool execution.
 
@@ -516,10 +516,10 @@ LUMI operates across **`plan`**, **`act`**, and **`auto`** (Guided Spec) modes. 
 | Mode | Response tool | Behavior | Non-Technical & Developer Ergonomics |
 |------|---------------|----------|--------------------------------------|
 | **Plan** | `plan_mode_respond` | Strategy, exploration, read-only tools | Large repository traversals and file searches compact structural outlines into CAS without token bloat. |
-| **Act** | `act_mode_respond` | Implementation — mutating tools with approval | Command logs and tool evidence are projected under strict transactions for rapid diff approvals. |
+| **Act** | `act_mode_respond` | Implementation — agent-selected operations run autonomously within task scope | Command logs and tool evidence are projected under strict transactions for review and recovery. |
 | **AUTO (Guided Spec)** | Guided Spec Engine | Zero-syntax product management wrapper | Suppresses code and terminal noise. Renders visual Breadboards, Progress Steppers, 1-Click Decision Chips (`Option A`/`Option B`), and Superhuman keyboard shortcuts (`Press A`/`Press B`). |
 
-Typical flow: gather context in Plan → approve direction → Act executes writes → `attempt_completion` through completion gates. Non-technical client approvers can switch to **AUTO** mode to steer feature builds via 1-click approvals with zero code fatigue.
+Typical flow: autonomous Act execution or a read-only Plan pass → review or steer the workspace diff → `attempt_completion` through completion gates. Non-technical client approvers can switch to **AUTO** mode to steer feature builds via 1-click decisions with zero code fatigue.
 
 Guide: [docs/core-features/guided-spec-mode.md](docs/core-features/guided-spec-mode.md) · Architecture ADR: [ADR-003](docs/architecture/adr-003-guided-spec-execution-mode.md) / [ADR-017](DECISIONS.md#adr-017-guided-spec-execution-mode-v100-spec--zero-syntax-product-management)
 
@@ -710,7 +710,7 @@ Include VS Code version, LUMI **11.0.0**, provider used, and steps to reproduce.
 
 | Boundary | Enforcement |
 |----------|-------------|
-| Mutating tools | Approval UI + diff before write |
+| Tool execution | `ExecutionFunnel`; autonomous dispatch decisions with policy, hook, authority, and lifecycle checks |
 | Secrets | `~/.dietcode/data/secrets.json` (mode `0600`) |
 | Settings & state | `~/.dietcode/data/` |
 | Workspace memory | `./dietcode.db` (BroccoliDB SQLite) |

@@ -212,7 +212,7 @@ Check receipt `roadmapLinkage.workspaceCommit.blockReason`:
 | Control | Runtime behavior | Operator implication |
 |---------|------------------|----------------------|
 | Concurrency | At most 3 active model requests through a priority-aware bulkhead pool (FIFO within equal priority; 1 slot reserved for fast I/O when waiting) | Capacity is bounded; non-mutating lanes cannot be starved by mutation lanes; backoff releases slots |
-| Approval | Read permission and read/diagnostic tools for non-mutating lanes; edit permission or one approval for mutation | Inner lane I/O does not prompt repeatedly after authority is granted |
+| Approval | In-scope batches launch without a second prompt in autonomous mode; with it off, the parent receives one launch decision. Each child operation still uses its own funnel policy and permit. | Launch consent is not inherited as a child permit; eligible child operations continue under their own policy without repeated prompts |
 | DAG priority | Weighted longest ready downstream path (read-only/diagnostic boost) | Lanes that unblock more work and fast I/O authority lanes may start before lower-index lanes |
 | Status persistence | Latest state coalesced to 250 ms; partial running progress is UI-only | Disk writes at terminal staging/seal only; parent stops progress I/O before sealing |
 | Artifact writes | Invocation-ordered per swarm, atomic temp-file replacement, unsealed staging marker | Different swarms persist concurrently; readers never see torn JSON or resume pre-seal state |

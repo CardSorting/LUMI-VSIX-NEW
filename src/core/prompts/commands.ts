@@ -197,8 +197,7 @@ Below is the user's input when they indicated that they wanted to create a new D
 
 export const reportBugToolResponse = () =>
 	`<explicit_instructions type="report_bug">
-The user has explicitly asked you to help them submit a bug to the DietCode github page (you MUST now help them with this irrespective of what your conversation up to this point in time was). To do so you will use the report_bug tool which is defined below. However, you must first ensure that you have collected all required information to fill in all the parameters for the tool call. If any of the the required information is apparent through your previous conversation with the user, you can suggest how to fill in those entries. However you should NOT assume you know what the issue about unless it's clear.
-Otherwise, you should converse with the user until you are able to gather all the required details. When conversing with the user, make sure you ask for/reference all required information/fields. When referencing the required fields, use human friendly versions like "Steps to reproduce" rather than "steps_to_reproduce". Only then should you use the report_bug tool call.
+The user explicitly invoked this command to prepare a bug report. Use conversation history, task results, and available workspace evidence to fill the fields. Never invent facts; use N/A for unknown noncritical details. Ask one concise question only when a missing fact is essential to avoid a misleading report, then call report_bug without requesting confirmation of already provided information.
 The report_bug tool can be used in either of the PLAN or ACT modes.
 
 The report_bug tool call is defined below:
@@ -245,25 +244,26 @@ Follow these steps to explain code changes:
 
 ## 1. Gather Information About the Changes
 
-First, use git or gh CLI tools to understand what changes exist. **Always get the full unified diff output**, not just stats:
+First, inspect git or gh status and changed paths. Read relevant diff hunks; request the full unified diff only when the change set is bounded and it adds useful context. Avoid loading unrelated history or huge diffs:
 
-- For commits: \`git --no-pager show <commit>\` to see a specific commit's full diff
-- For commit ranges: \`git --no-pager log --oneline <from>..<to>\` to see commits in range, then \`git --no-pager diff <from>..<to>\` for full diff
-- For branches: \`git --no-pager diff <branch1>..<branch2>\` to see full diff of all changes
-- For pull requests: \`gh pr view <number> --json commits,files\` for metadata, then \`gh pr diff <number> | cat\` for full diff
-- For staged changes: \`git --no-pager diff --cached\` to see full diff of staged files
-- For working directory: \`git --no-pager diff\` for full diff of unstaged changes
+- For commits: inspect the commit summary and changed paths first, then read focused hunks for relevant files.
+- For commit ranges: inspect the commit list and changed paths first, then read focused hunks for relevant files.
+- For branches: compare changed paths before opening diffs; narrow the diff to the files needed for the explanation.
+- For pull requests: use \`gh pr view <number> --json commits,files\` for metadata, then inspect only relevant paths from the PR diff.
+- For staged and working-tree changes: use \`git --no-pager diff --cached -- <paths>\` and \`git --no-pager diff -- <paths>\` after identifying changed paths.
+- Use \`git --no-pager show <ref>:<file>\` when a focused before-version is needed.
+- Avoid full diffs for large or mixed changes; expand only when focused hunks cannot explain the relevant changes.
 
-To get a comprehensive overview between two refs, run:
+For bounded comparisons, identify relevant paths first and inspect only the output needed to explain those changes. Avoid full diffs for large or mixed changes.
 
 **Bash:**
 \`\`\`bash
-echo "=== COMMITS ==="; git --no-pager log --oneline <from_ref>..<to_ref>; echo "=== CHANGED FILES ==="; git diff <from_ref>..<to_ref> --name-only; echo "=== FULL DIFF ==="; git --no-pager diff <from_ref>..<to_ref>
+git --no-pager diff <from_ref>..<to_ref> -- <relevant_paths>
 \`\`\`
 
 **PowerShell:**
 \`\`\`powershell
-'=== COMMITS ==='; git --no-pager log --oneline <from_ref>..<to_ref>; '=== CHANGED FILES ==='; git diff <from_ref>..<to_ref> --name-only; '=== FULL DIFF ==='; git --no-pager diff <from_ref>..<to_ref>
+git --no-pager diff <from_ref>..<to_ref> -- <relevant_paths>
 \`\`\`
 
 Replace \`<from_ref>\` and \`<to_ref>\` with the appropriate git references (commit hashes, branch names, tags, HEAD~1, etc.).
@@ -284,8 +284,8 @@ The more context you have in your conversation history, the better the explanati
 
 Identify the appropriate git references for the diff:
 
-- **from_ref**: The "before" state (commit hash, branch name, tag, HEAD~1, etc.)
-- **to_ref**: The "after" state (optional - defaults to working directory if omitted)
+- **from_ref**: Infer the "before" state from the request and available git context (commit hash, branch name, tag, HEAD~1, etc.).
+- **to_ref**: The "after" state (optional; defaults to the current working tree when omitted).
 
 Examples of reference combinations:
 - Last commit: from_ref="HEAD~1", to_ref="HEAD"
@@ -306,14 +306,7 @@ Below is the user's input describing what changes they want explained. If no inp
 
 export const replanToolResponse = () =>
 	`<explicit_instructions type="replan">
-The user has explicitly asked you to revisit the plan or change direction before continuing implementation.
-
-You MUST return to planning behavior:
-1. Re-read relevant context with read-only tools as needed
-2. Present a revised plan via plan_mode_respond
-3. The system automatically transitions back to ACT MODE after your finalized plan
-
-Do NOT proceed with file edits, commands, or other side-effect tools until you have presented an updated plan via plan_mode_respond.
+The user has asked you to revisit direction. Keep the current task and completed work. Re-read only evidence affected by the change, update the implementation sequence, and continue independent work while resolving dependencies. Do not repeat completed discovery or wait for plan approval. If a mode transition is needed, use plan_mode_respond once; the system returns to ACT MODE automatically, then continue implementation.
 </explicit_instructions>\n
 `
 
@@ -321,24 +314,22 @@ Do NOT proceed with file edits, commands, or other side-effect tools until you h
  * Generates the deep-planning slash command response with model-family-aware variant selection
  * @param focusChainSettings Optional focus chain settings to include in the prompt
  * @param providerInfo Optional API provider info for model family detection
- * @param enableNativeToolCalls Optional flag to determine if native tool calling is enabled
  * @returns The deep-planning prompt string with appropriate variant and focus chain settings applied
  */
 export const deepPlanningToolResponse = (
 	focusChainSettings?: { enabled: boolean },
 	providerInfo?: ApiProviderInfo,
-	enableNativeToolCalls?: boolean,
 	modEnabled?: boolean,
 ) => {
-	return getDeepPlanningPrompt(focusChainSettings, providerInfo, enableNativeToolCalls, modEnabled)
+	return getDeepPlanningPrompt(focusChainSettings, providerInfo, modEnabled)
 }
 
 export const documentToolResponse = () =>
 	`<explicit_instructions type="document">
-The user has explicitly asked you to trigger a Forensic Documentation pass. This is a critical architectural alignment phase where you must ensure that the Knowledge Ledger (.wiki/ directory) is the **Definitive Architectural Bridge** for human collaborators.
+The user requested a documentation pass. Keep the .wiki/ knowledge base accurate, navigable, and grounded in current source. Update the material that is stale or useful for the requested scope.
 
-### 🛑 OMNI-BRIDGE PROTOCOL (HIERARCHICAL TAXONOMY)
-You MUST organize the '.wiki/' directory into a strict hierarchical taxonomy to ensure it is approachable and parsable. Do NOT dump everything into the root.
+### Optional taxonomy guidance
+Preserve the existing .wiki/ structure. Use subdirectories when they improve navigation for substantial content; do not create empty or speculative pages to satisfy a fixed taxonomy.
 
 **1. Onboarding ('.wiki/onboarding/')**
 - 'getting-started.md': Actionable setup, environment requirements, and first-run instructions.
@@ -360,16 +351,17 @@ You MUST organize the '.wiki/' directory into a strict hierarchical taxonomy to 
 - 'index.md': The primary dashboard and Table of Contents routing to the sub-directories.
 - 'changelog.md': The continuous ledger of granular structural changes.
 
-### 🛑 STRICT ACTION MANDATE
-- **ZERO CONVERSATION**: You are FORBIDDEN from providing any conversational acknowledgment or intro.
-- **IMMEDIATE EXECUTION**: Your first action MUST be a technical tool call (\`diagnose_sovereignty\`, \`list_dir\`, or \`git status\`).
-- **KNOWLEDGE BASE INITIALIZATION**: If the \`.wiki/\` directory is missing or flat, initialize the full hierarchical taxonomy immediately: \`index.md\`, \`onboarding/getting-started.md\`, \`architecture/overview.md\`, etc.
+### Efficient workflow
+- Start with the best available project map, file listing, or git status; select tools based on workspace context instead of requiring a specific first call.
+- Batch independent reads and searches when supported. Trace claims to source before updating them.
+- If .wiki/ is absent, create only pages needed for this request. If it exists, update it in place.
+- Continue without asking for plan approval or confirmation between research and edits.
 
 ### 🚫 Git Stall Warning
 Do NOT attempt to read massive git logs or full diffs of the entire history. This causes system stalls and information overload. If you must use git to see recent activity, limit it to \`git status\` or \`git log -n 10 --oneline\`. Your priority is the **living state** of the files, not their history.
 
 ### 🏗️ Environmental Awareness Protocol
-You must perform a deep structural audit to document:
+Map only the parts of the workspace needed to verify relevant documentation claims:
 1. **Workspace Architecture**: Use structural tools (Spider Engine, \`list_dir\`) to map the current hierarchy and identify core patterns.
 2. **Project Environment**: Identify the active tech stack, entry points, core service layers, and environmental configurations.
 3. **Logic Density**: Document where the primary logic resides and identify active development hotspots.
@@ -380,7 +372,7 @@ You must perform a deep structural audit to document:
 2. **Synchronize**: Update relevant wiki files to reflect the **current environment** and active state.
 3. **Verification Probes**: Ensure every claim in the documentation is grounded in physical file observations made during this pass.
 
-Irrespective of whether additional instructions are given, you should prioritize calling the attempt_completion tool ONLY AFTER you have ensured the documentation is synchronized with the **actual workspace state**. If the workspace is complex, you MUST spawn the Forensic Sub-Agent to perform a deep-dive audit.
+Before completing, verify changed pages, links, and factual claims against their sources. Use subagents only when enabled and when independent audit scopes materially reduce the critical path; delegation is optional. Complete in this task without a confirmation handoff.
 
 Below is the user's input when they indicated that they wanted to trigger the document phase.
 </explicit_instructions>\n

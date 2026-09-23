@@ -44,7 +44,7 @@ export class NewTaskHandler implements IToolHandler, IPartialBlockHandler {
 
 		config.taskState.consecutiveMistakeCount = 0
 
-		// ExecutionFunnel recorded explicit consent before this adapter was dispatched.
+		// ExecutionFunnel recorded the autonomous or guided admission decision before dispatch.
 		return formatResponse.toolResult(`The user has created a new task with the provided context.`)
 	}
 }
