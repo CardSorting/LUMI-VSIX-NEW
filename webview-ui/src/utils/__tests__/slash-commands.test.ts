@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { getMatchingSlashCommands, slashCommandRegex, validateSlashCommand } from "../slash-commands"
+import { slashCommandRegex } from "../slash-commands"
 
 describe("slash-commands", () => {
 	describe("slashCommandRegex with MCP format", () => {

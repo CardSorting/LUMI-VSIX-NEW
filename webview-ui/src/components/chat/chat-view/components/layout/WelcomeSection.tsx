@@ -1,7 +1,6 @@
 import { DietCodeMessage } from "@shared/ExtensionMessage"
 import { StringRequest } from "@shared/proto/dietcode/common"
 import { Mode } from "@shared/storage/types"
-import { Braces, Bug, Flag, Layers } from "lucide-react"
 import React, { useCallback, useMemo } from "react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { TaskServiceClient } from "@/services/grpc-client"
@@ -59,65 +58,12 @@ export const WelcomeSection: React.FC<RedesignedWelcomeSectionProps> = ({
 			console.error("Error opening task:", error),
 		)
 	}, [])
-	const handleStartPrompt = useCallback(
-		(prompt: string) => {
-			chatState?.setInputValue(prompt)
-			setTimeout(() => chatState?.textAreaRef.current?.focus(), 0)
-		},
-		[chatState],
-	)
-
-	const primaryCards = [
-		{
-			id: "explain",
-			title: "Explain codebase",
-			icon: Braces,
-			prompt: "Look through this workspace and explain what this project does in plain language. Summarize the main parts and how they fit together.",
-		},
-		{
-			id: "fix",
-			title: "Fix a bug",
-			icon: Bug,
-			prompt: "I'd like help fixing an issue in this project. Ask me what isn't working, then investigate and walk me through a fix.",
-		},
-		{
-			id: "plan",
-			title: "Plan a feature",
-			icon: Flag,
-			prompt: "I want to add a feature to this project. Ask what I have in mind, then help me plan and implement it step by step.",
-		},
-		{
-			id: "review",
-			title: "Review architecture",
-			icon: Layers,
-			prompt: "Perform an architectural review of this codebase. Evaluate the design decisions, patterns used, and overall code quality.",
-		},
-	]
-
 	return (
 		<div className="flex-1 overflow-y-auto px-4 py-2 md:px-6 max-w-[1000px] mx-auto w-full select-none flex flex-col justify-between">
 			<div>
 				{/* Welcome Hero Area */}
-				<div className="mb-3 mt-1 flex justify-center">
+				<div className="mb-4 mt-1">
 					<h1 className="text-sm font-medium leading-tight text-foreground">How can I help you build today?</h1>
-				</div>
-
-				{/* Primary Task Cards - Horizontal Chips */}
-				<div className="flex gap-2 justify-center mb-3 overflow-x-auto py-1 w-full scrollbar-none">
-					{primaryCards.map((card) => {
-						const IconComp = card.icon
-						return (
-							<button
-								className="flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-list-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								key={card.id}
-								onClick={() => handleStartPrompt(card.prompt)}
-								disabled={!chatState}
-								type="button">
-								<IconComp aria-hidden className="size-3.5 text-muted-foreground" />
-								<span>{card.title}</span>
-							</button>
-						)
-					})}
 				</div>
 
 				{/* Recent-chat section */}

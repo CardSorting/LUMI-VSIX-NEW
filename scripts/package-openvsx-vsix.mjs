@@ -61,7 +61,6 @@ function main() {
 	const version = pkg.version
 	const target = nativeTargetForHost()
 	const outPath = path.join(repoRoot, "dist", `lumi-${version}-${target}.vsix`)
-	const didPatchName = false
 	let didReconcileWorkspaceLink = false
 
 	fs.mkdirSync(path.dirname(outPath), { recursive: true })
@@ -78,7 +77,6 @@ function main() {
 			delete pkg.scripts["vscode:prepublish"]
 		}
 		fs.writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, "\t")}\n`)
-		execFileSync("git", ["add", "package.json"], { cwd: repoRoot })
 		console.log(`[openvsx] patched name → "${OPENVSX_EXTENSION_NAME}" (CardSorting.${OPENVSX_EXTENSION_NAME})`)
 
 		didReconcileWorkspaceLink = workspaceLinks.reconcile({
@@ -118,7 +116,6 @@ function main() {
 			const currentPkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"))
 			currentPkg.name = MARKETPLACE_EXTENSION_NAME
 			fs.writeFileSync(packageJsonPath, `${JSON.stringify(currentPkg, null, "\t")}\n`)
-			execFileSync("git", ["add", "package.json"], { cwd: repoRoot, stdio: "ignore" })
 			console.log(`[openvsx] restored name → "${MARKETPLACE_EXTENSION_NAME}"`)
 		} catch {}
 	}

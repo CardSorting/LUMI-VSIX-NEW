@@ -1,10 +1,5 @@
 import { McpTool } from "@shared/mcp"
-import { ToggleToolAutoApproveRequest } from "@shared/proto/dietcode/mcp"
-import { convertProtoMcpServersToMcpServers } from "@shared/proto-conversions/mcp/mcp-server-conversion"
-import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 import { VscIcon } from "@/components/ui/vsc-icon"
-import { useExtensionState } from "@/context/ExtensionStateContext"
-import { McpServiceClient } from "@/services/grpc-client"
 
 type McpToolRowProps = {
 	tool: McpTool
@@ -15,30 +10,7 @@ type ToolParameterSchema = {
 	description?: string
 }
 
-const McpToolRow = ({ tool, serverName }: McpToolRowProps) => {
-	const { autoApprovalSettings, setMcpServers } = useExtensionState()
-
-	const handleAutoApproveChange = () => {
-		if (!serverName) {
-			return
-		}
-
-		McpServiceClient.toggleToolAutoApprove(
-			ToggleToolAutoApproveRequest.create({
-				serverName,
-				toolNames: [tool.name],
-				autoApprove: !tool.autoApprove,
-			}),
-		)
-			.then((response) => {
-				const mcpServers = convertProtoMcpServersToMcpServers(response.mcpServers)
-				setMcpServers(mcpServers)
-			})
-			.catch((error) => {
-				console.error("Error toggling tool auto-approve", error)
-			})
-	}
-
+const McpToolRow = ({ tool }: McpToolRowProps) => {
 	const toolProperties =
 		tool.inputSchema && "properties" in tool.inputSchema
 			? (tool.inputSchema.properties as Record<string, ToolParameterSchema>)
@@ -57,15 +29,6 @@ const McpToolRow = ({ tool, serverName }: McpToolRowProps) => {
 					<VscIcon className="" name="symbol-method" style={{ marginRight: "6px", flexShrink: 0 }} />
 					<span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>{tool.name}</span>
 				</div>
-				{serverName && autoApprovalSettings.actions.useMcp && (
-					<VSCodeCheckbox
-						checked={tool.autoApprove ?? false}
-						data-tool={tool.name}
-						onChange={handleAutoApproveChange}
-						style={{ fontSize: "11px" }}>
-						Auto-approve
-					</VSCodeCheckbox>
-				)}
 			</div>
 			{tool.description && (
 				<div

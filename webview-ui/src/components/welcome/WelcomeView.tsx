@@ -11,25 +11,40 @@ import { resolveOrbMood, useLumiSessionComfort } from "@/hooks/useLumiSessionCom
 import { AccountServiceClient, StateServiceClient } from "@/services/grpc-client"
 
 const WelcomeView = memo(() => {
-	const { mode, openAiCodexIsAuthenticated } = useExtensionState()
+	const { mode, openAiCodexIsAuthenticated, openAiCodexAccountEmail, openAiCodexAuthError } = useExtensionState()
 	const [isLoading, setIsLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const { isStill, calmTier } = useLumiSessionComfort()
 	const { handleModeFieldChange } = useApiConfigurationHandlers()
 
 	const [isWaitingForCallback, setIsWaitingForCallback] = useState(false)
+	const [isCancellingSignIn, setIsCancellingSignIn] = useState(false)
+	const [isSigningOut, setIsSigningOut] = useState(false)
+	const [authError, setAuthError] = useState<string | null>(null)
 
 	useEffect(() => {
-		if (openAiCodexIsAuthenticated) setIsWaitingForCallback(false)
-	}, [openAiCodexIsAuthenticated])
+		if (openAiCodexIsAuthenticated) {
+			setIsWaitingForCallback(false)
+			setIsCancellingSignIn(false)
+			setIsSigningOut(false)
+			setAuthError(null)
+		} else if (openAiCodexAuthError) {
+			setIsWaitingForCallback(false)
+			setAuthError(openAiCodexAuthError)
+		} else if (isSigningOut) {
+			setIsSigningOut(false)
+		}
+	}, [openAiCodexIsAuthenticated, openAiCodexAuthError, isSigningOut])
 
 	const handleCodexSignIn = async () => {
+		setAuthError(null)
 		setIsLoading(true)
-		setIsWaitingForCallback(true)
+		setIsWaitingForCallback(false)
 		try {
 			await AccountServiceClient.openAiCodexSignIn({})
+			setIsWaitingForCallback(true)
 		} catch (error) {
-			console.error("Failed to sign in to OpenAI Codex:", error)
+			setAuthError(error instanceof Error ? error.message : "Could not start sign-in.")
 			setIsWaitingForCallback(false)
 		} finally {
 			setIsLoading(false)
@@ -37,10 +52,26 @@ const WelcomeView = memo(() => {
 	}
 
 	const handleCodexSignOut = async () => {
+		setAuthError(null)
+		setIsSigningOut(true)
 		try {
 			await AccountServiceClient.openAiCodexSignOut({})
 		} catch (error) {
-			console.error("Failed to sign out of OpenAI Codex:", error)
+			setIsSigningOut(false)
+			setAuthError(error instanceof Error ? error.message : "Could not disconnect Codex.")
+		}
+	}
+
+	const handleCancelCodexSignIn = async () => {
+		setIsCancellingSignIn(true)
+		setAuthError(null)
+		try {
+			await AccountServiceClient.openAiCodexCancelSignIn({})
+			setIsWaitingForCallback(false)
+		} catch (error) {
+			setAuthError(error instanceof Error ? error.message : "Could not cancel sign-in.")
+		} finally {
+			setIsCancellingSignIn(false)
 		}
 	}
 
@@ -115,33 +146,49 @@ const WelcomeView = memo(() => {
 						<div className="mt-2 pt-2 border-t border-border-panel/40 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
 							{openAiCodexIsAuthenticated ? (
 								<div className="flex items-center justify-between gap-2">
-									<span className="text-xs text-success flex items-center gap-1.5 font-medium">
-										<VscIcon className="size-4" name="check" /> Ready to use
-									</span>
-									<VSCodeButton appearance="secondary" className="rounded-lg h-8" onClick={handleCodexSignOut}>
-										Sign Out
+									<div className="min-w-0">
+										<span className="text-xs text-success flex items-center gap-1.5 font-medium">
+											<VscIcon className="size-4" name="check" /> Connected to ChatGPT
+										</span>
+										{openAiCodexAccountEmail && (
+											<p className="text-[11px] text-description m-0 mt-1 break-all">
+												{openAiCodexAccountEmail}
+											</p>
+										)}
+										<p className="text-[10px] text-description m-0 mt-1">
+											Disconnecting only removes the connection from LUMI. Your ChatGPT browser session
+											stays signed in.
+										</p>
+									</div>
+									<VSCodeButton
+										appearance="secondary"
+										className="rounded-lg h-8"
+										disabled={isSigningOut}
+										onClick={handleCodexSignOut}>
+										{isSigningOut ? "Disconnecting…" : "Disconnect"}
 									</VSCodeButton>
 								</div>
 							) : isWaitingForCallback ? (
 								<div className="flex flex-col gap-2 p-2 rounded-lg bg-lumi/5 border border-lumi/20">
-									<div className="flex items-center gap-2">
+									<output aria-live="polite" className="flex items-center gap-2">
 										<LumiProgressIndicator />
 										<span className="text-xs text-foreground font-medium">Waiting for authorization...</span>
-									</div>
+									</output>
 									<p className="text-[10px] text-description m-0 leading-normal">
 										We opened a tab in your browser. Please sign in there and authorize the connection.
 									</p>
 									<VSCodeButton
 										appearance="secondary"
 										className="w-full h-8 rounded-lg mt-1"
-										onClick={() => setIsWaitingForCallback(false)}>
-										Cancel
+										disabled={isCancellingSignIn}
+										onClick={handleCancelCodexSignIn}>
+										{isCancellingSignIn ? "Cancelling…" : "Cancel"}
 									</VSCodeButton>
 								</div>
 							) : (
 								<VSCodeButton
 									className="btn-premium-lumi w-full h-9 rounded-lg"
-									disabled={isLoading}
+									disabled={isLoading || isWaitingForCallback}
 									onClick={handleCodexSignIn}>
 									<span>Connect Subscription</span>
 									{isLoading && <LumiProgressIndicator />}
@@ -150,6 +197,11 @@ const WelcomeView = memo(() => {
 						</div>
 					</div>
 				</div>
+				{authError && (
+					<p className="text-xs m-0 text-[var(--vscode-errorForeground)]" role="alert">
+						{authError}
+					</p>
+				)}
 
 				<div className="flex flex-col gap-3 mt-2">
 					<VSCodeButton

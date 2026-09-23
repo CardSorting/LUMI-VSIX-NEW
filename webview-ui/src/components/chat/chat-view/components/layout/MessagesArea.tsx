@@ -1,6 +1,7 @@
 import type { DietCodeMessage } from "@shared/ExtensionMessage"
 import { memo, useCallback, useMemo } from "react"
 import { Virtuoso } from "react-virtuoso"
+import { InitialTaskPrompt } from "@/components/chat/InitialTaskPrompt"
 import type { ChatState, MessageHandlers, ScrollBehavior } from "../../types/chatTypes"
 import { SCROLL_CONSTANTS } from "../../utils/scrollUtils"
 import { createMessageRenderer } from "../messages/MessageRenderer"
@@ -77,9 +78,17 @@ export const MessagesArea = memo<MessagesAreaProps>(
 		// Leave a small tail after the last message for scroll stability.
 		const virtuosoComponents = useMemo(
 			() => ({
+				Header: () => (
+					<InitialTaskPrompt
+						key={task.ts}
+						onSendMessage={messageHandlers.handleSendMessage}
+						showPreparingStatus={groupedMessages.length === 0}
+						task={task}
+					/>
+				),
 				Footer: () => <div className="min-h-1" />,
 			}),
-			[],
+			[groupedMessages.length, messageHandlers.handleSendMessage, task],
 		)
 
 		return (
@@ -102,7 +111,7 @@ export const MessagesArea = memo<MessagesAreaProps>(
 						// while followOutput handles bottom anchoring during streaming.
 						followOutput={followOutput}
 						increaseViewportBy={MESSAGE_VIEWPORT_INCREASE}
-						initialTopMostItemIndex={groupedMessages.length - 1}
+						initialTopMostItemIndex={Math.max(0, groupedMessages.length - 1)}
 						itemContent={itemContent}
 						key={task.ts}
 						rangeChanged={handleRangeChanged}

@@ -1,29 +1,29 @@
 :root {
 	/* Default fallbacks for VSCode theme variables in standalone browser mode */
 	--vscode-foreground: #faf9f7;
-	--vscode-descriptionForeground: #8a8996;
+	--vscode-descriptionForeground: #a2a2ad;
 	--vscode-sideBar-background: #0f0f12;
 	--vscode-sideBar-foreground: #faf9f7;
 	--vscode-panel-background: #121216;
 	--vscode-panel-border: #20202a;
-	--vscode-focusBorder: #6366a0;
+	--vscode-focusBorder: #8491a5;
 	--vscode-editor-background: #16161d;
 	--vscode-editor-foreground: #faf9f7;
 	--vscode-input-background: #1a1a22;
 	--vscode-input-foreground: #faf9f7;
 	--vscode-input-border: #20202a;
 	--vscode-input-placeholderForeground: #8a8996;
-	--vscode-button-background: #6366a0;
+	--vscode-button-background: #53647d;
 	--vscode-button-foreground: #ffffff;
-	--vscode-button-hoverBackground: #7a7db4;
+	--vscode-button-hoverBackground: #65758d;
 	--vscode-button-secondaryBackground: #272730;
 	--vscode-button-secondaryForeground: #faf9f7;
 	--vscode-button-secondaryHoverBackground: #32323e;
 	--vscode-list-hoverBackground: rgba(255, 255, 255, 0.05);
-	--vscode-list-activeSelectionBackground: #6366a0;
+	--vscode-list-activeSelectionBackground: #3d4a5e;
 	--vscode-list-activeSelectionForeground: #ffffff;
-	--vscode-textLink-foreground: #6bb5c9;
-	--vscode-textLink-activeForeground: #8a8996;
+	--vscode-textLink-foreground: #91b4bc;
+	--vscode-textLink-activeForeground: #b3c9cd;
 	--vscode-editorGroup-border: #20202a;
 	--vscode-editorWidget-border: #20202a;
 	--vscode-textCodeBlock-background: #1a1a22;
@@ -34,8 +34,8 @@
 /* Editor theme mapping */
 @theme {
 	/* LUMI brand palette — calm, technical, approachable */
-	--color-lumi: #6366a0;
-	--color-lumi-cyan: #6bb5c9;
+	--color-lumi: #657187;
+	--color-lumi-cyan: #7894a0;
 	--color-lumi-bg-dark: #121216;
 	--color-lumi-bg-sidebar: #1a1a22;
 	--color-lumi-panel: #1e1e26;
@@ -47,13 +47,13 @@
 	--color-lumi-slate: #64748b;
 	--color-lumi-warm: #faf9f7;
 	--color-lumi-foreground: #faf9f7;
-	--color-fg-lumi: #6366a0;
+	--color-fg-lumi: #657187;
 	/* Legacy aliases — keep existing utility class names working */
 	--color-dietcode: var(--color-lumi);
 	--color-dietcode-foreground: var(--color-lumi-foreground);
 	--color-fg-dietcode: var(--color-fg-lumi);
 	--color-background: var(--vscode-sideBar-background);
-	--color-border: var(--vscode-focusBorder);
+	--color-border: var(--vscode-sideBar-border, var(--vscode-panel-border, rgba(127, 127, 127, 0.28)));
 	--color-border-panel: var(--vscode-panel-border);
 	--color-foreground: var(--vscode-foreground);
 	--color-shadow: var(--vscode-widget-shadow);
@@ -94,7 +94,7 @@
 	--color-button-secondary-background-hover: var(--vscode-button-secondaryHoverBackground);
 	--color-button-secondary-foreground: var(--vscode-button-secondaryForeground);
 	--color-muted: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 65%, transparent);
-	--color-muted-foreground: var(--vscode-editor-foldPlaceholderForeground);
+	--color-muted-foreground: var(--vscode-descriptionForeground, #a2a2ad);
 	--color-menu: var(--vscode-menu-background);
 	--color-menu-foreground: var(--vscode-menu-foreground);
 	--color-menu-border: var(--vscode-menu-border);
@@ -120,7 +120,7 @@
 	--color-failed-icon: var(--vscode-testing-iconFailed);
 	--color-error: var(--vscode-errorForeground, #c42b2b);
 	--color-error-icon: var(--vscode-problemsErrorIcon-foreground, #c42b2b);
-	--color-description: var(--vscode-descriptionForeground);
+	--color-description: var(--vscode-descriptionForeground, #a2a2ad);
 	--color-success: var(--vscode-charts-green);
 	--color-warning: var(--vscode-charts-yellow);
 	--font-base:
@@ -309,7 +309,7 @@
 	}
 
 	/* LUMI brand gradients & glow */
-	--gradient-lumi: linear-gradient(135deg, #7a7eb8 0%, #8ec4d4 100%);
+	--gradient-lumi: linear-gradient(135deg, var(--vscode-button-background), var(--vscode-button-background));
 	--gradient-cola: var(--gradient-lumi);
 	--gradient-silver: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
 	--shadow-premium: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1), 0 10px 15px -3px rgb(0 0 0 / 0.1);
@@ -338,9 +338,9 @@
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
-	--color-border: var(--border);
-	--color-input: var(--input);
-	--color-ring: var(--ring);
+	--color-border: var(--vscode-sideBar-border, var(--vscode-panel-border, rgba(127, 127, 127, 0.28)));
+	--color-input: var(--vscode-input-border, var(--input));
+	--color-ring: var(--vscode-focusBorder, var(--ring));
 	--color-chart-1: var(--chart-1);
 	--color-chart-2: var(--chart-2);
 	--color-chart-3: var(--chart-3);

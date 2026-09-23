@@ -8,17 +8,8 @@ describe("ChatInputActions keyboard ergonomics", () => {
 		const user = userEvent.setup()
 		const onContextClick = vi.fn()
 		const onAttachClick = vi.fn()
-		const onModelClick = vi.fn()
 
-		render(
-			<ChatInputActions
-				attachDisabled={false}
-				modelDisplayName="provider:model"
-				onAttachClick={onAttachClick}
-				onContextClick={onContextClick}
-				onModelClick={onModelClick}
-			/>,
-		)
+		render(<ChatInputActions attachDisabled={false} onAttachClick={onAttachClick} onContextClick={onContextClick} />)
 
 		await user.tab()
 		const addContextButton = screen.getByRole("button", { name: "Add context" })
@@ -27,19 +18,11 @@ describe("ChatInputActions keyboard ergonomics", () => {
 		await user.click(screen.getByRole("button", { name: /Mention workspace item/ }))
 		expect(onContextClick).toHaveBeenCalledOnce()
 
-		expect(screen.getByRole("button", { name: /Change model/ })).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: /Change model/ })).not.toBeInTheDocument()
 	})
 
 	it("exposes disabled attachment semantics", async () => {
-		render(
-			<ChatInputActions
-				attachDisabled
-				modelDisplayName="provider:model"
-				onAttachClick={() => {}}
-				onContextClick={() => {}}
-				onModelClick={() => {}}
-			/>,
-		)
+		render(<ChatInputActions attachDisabled onAttachClick={() => {}} onContextClick={() => {}} />)
 
 		await userEvent.setup().click(screen.getByRole("button", { name: "Add context" }))
 		expect(screen.getByRole("button", { name: "Attach file or image" })).toBeDisabled()
@@ -54,10 +37,8 @@ describe("ChatInputActions keyboard ergonomics", () => {
 				attachDisabled={false}
 				isListening={false}
 				isSpeechSupported={true}
-				modelDisplayName="provider:model"
 				onAttachClick={() => {}}
 				onContextClick={() => {}}
-				onModelClick={() => {}}
 				onVoiceClick={onVoiceClick}
 			/>,
 		)
@@ -74,10 +55,8 @@ describe("ChatInputActions keyboard ergonomics", () => {
 				attachDisabled={false}
 				isListening={false}
 				isSpeechSupported={false}
-				modelDisplayName="provider:model"
 				onAttachClick={() => {}}
 				onContextClick={() => {}}
-				onModelClick={() => {}}
 				onVoiceClick={() => {}}
 			/>,
 		)

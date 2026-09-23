@@ -12,6 +12,7 @@ import type { ShowWebviewEvent } from "@shared/proto/dietcode/ui"
 import { lazy, memo, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { useMount } from "react-use"
 import { isChatInputEnabled } from "@/components/chat/chat-view/shared/chatInputPolicy"
+import { InitialTaskPrompt } from "@/components/chat/InitialTaskPrompt"
 import { normalizeApiConfiguration } from "@/components/settings/utils/providerUtils"
 import { useChatMessages, useExtensionState } from "@/context/ExtensionStateContext"
 import { pickChatPlaceholder } from "@/copy/lumiVoice"
@@ -316,7 +317,17 @@ const ActiveChatView = memo<ActiveChatViewProps>(
 						</Suspense>
 					) : task ? (
 						<div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-							<Suspense fallback={<div aria-hidden className="flex min-h-0 flex-1" />}>
+							<Suspense
+								fallback={
+									<div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+										<InitialTaskPrompt
+											key={task.ts}
+											onSendMessage={messageHandlers.handleSendMessage}
+											showPreparingStatus={visibleMessages.length === 0}
+											task={task}
+										/>
+									</div>
+								}>
 								<MessagesArea
 									chatState={renderChatState}
 									groupedMessages={groupedMessages}

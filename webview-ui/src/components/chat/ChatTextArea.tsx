@@ -1,6 +1,5 @@
 import { mentionRegex } from "@shared/context-mentions"
 import { StringRequest } from "@shared/proto/dietcode/common"
-import { openAiCodexModels } from "@shared/api"
 import { FileSearchRequest, FileSearchType, RelativePathsRequest } from "@shared/proto/dietcode/file"
 import type React from "react"
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
@@ -10,7 +9,6 @@ import { CHAT_CONSTANTS } from "@/components/chat/chat-view/constants"
 import type { ComposerMode } from "@/components/chat/chat-view/shared/composerState"
 import SlashCommandMenu from "@/components/chat/SlashCommandMenu"
 import Thumbnails from "@/components/common/Thumbnails"
-import { normalizeApiConfiguration } from "@/components/settings/utils/providerUtils"
 import { Icon } from "@/components/ui/icons"
 import { useIsCompact, useIsUltraCompact } from "@/context/DensityContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
@@ -109,15 +107,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		},
 		ref,
 	) => {
-		const {
-			mode,
-			apiConfiguration,
-			localWorkflowToggles,
-			globalWorkflowToggles,
-			remoteWorkflowToggles,
-			remoteConfigSettings,
-			navigateToSettingsModelPicker,
-		} = useExtensionState()
+		const { localWorkflowToggles, globalWorkflowToggles, remoteWorkflowToggles, remoteConfigSettings } = useExtensionState()
 		const isCompact = useIsCompact()
 		const isUltraCompact = useIsUltraCompact()
 		const [isDraggingOver, setIsDraggingOver] = useState(false)
@@ -753,23 +743,6 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			} as React.ChangeEvent<HTMLTextAreaElement>
 			handleInputChange(event)
 		}, [inputValue, handleInputChange])
-
-		const handleModelButtonClick = () => {
-			navigateToSettingsModelPicker({ targetSection: "provider-openaicodex" })
-		}
-
-		// Get model display name
-		const modelDisplayName = useMemo(() => {
-			if (!apiConfiguration) {
-				return "Choose model"
-			}
-
-			const { selectedProvider, selectedModelId } = normalizeApiConfiguration(apiConfiguration, mode)
-			if (selectedProvider !== "openai-codex") {
-				return "Choose model"
-			}
-			return openAiCodexModels[selectedModelId]?.name || "Choose model"
-		}, [apiConfiguration, mode])
 
 		// Function to show error message for unsupported files for drag and drop
 		const showUnsupportedFileErrorMessage = () => {
@@ -1409,12 +1382,10 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 								attachDisabled={shouldDisableFilesAndImages}
 								isListening={isListening}
 								isSpeechSupported={isSpeechSupported}
-								modelDisplayName={modelDisplayName}
 								onAttachClick={() => {
 									if (!shouldDisableFilesAndImages) onSelectFilesAndImages()
 								}}
 								onContextClick={handleContextButtonClick}
-								onModelClick={handleModelButtonClick}
 								onVoiceClick={toggleVoiceInput}
 							/>
 						</div>

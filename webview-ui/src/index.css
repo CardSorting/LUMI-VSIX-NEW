@@ -239,11 +239,6 @@ body {
 	overflow-y: auto;
 }
 
-/* Legacy: keep hiding model button at very narrow widths */
-[data-density="ultra-compact"] .lumi-composer-model {
-	display: none;
-}
-
 /* Ultra-compact: suppress non-essential micro-animations */
 [data-density="ultra-compact"] .lumi-panel-reveal,
 [data-density="ultra-compact"] .animate-lumi-breathe,
@@ -268,32 +263,30 @@ body {
 /* Premium Styling Utilities */
 @layer components {
 	.glass-panel {
-		@apply backdrop-blur-md border border-white/10 dark:border-white/5 rounded-2xl;
-		background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+		@apply border border-border-panel rounded-lg;
+		background: var(--vscode-sideBar-background);
 	}
 
 	.dark .glass-panel {
-		background: linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.1) 100%);
+		background: var(--vscode-sideBar-background);
 	}
 
 	.btn-premium-lumi,
 	.btn-premium-cola {
-		@apply rounded-xl font-medium transition-all duration-300;
-		background: var(--gradient-lumi);
-		box-shadow: var(--shadow-premium);
-		color: var(--color-lumi-warm);
+		@apply rounded-md font-medium transition-colors duration-150;
+		background: var(--vscode-button-background);
+		box-shadow: none;
+		color: var(--vscode-button-foreground);
 	}
 
 	.btn-premium-lumi:hover:not(:disabled),
 	.btn-premium-cola:hover:not(:disabled) {
-		@apply -translate-y-0.5;
-		box-shadow: var(--glow-lumi);
-		filter: brightness(1.05);
+		background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
 	}
 
 	.btn-premium-lumi:active:not(:disabled),
 	.btn-premium-cola:active:not(:disabled) {
-		@apply translate-y-0 scale-98;
+		@apply translate-y-0;
 		box-shadow: none;
 	}
 

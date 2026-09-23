@@ -64,12 +64,15 @@ export function normalizeApiConfiguration(
 	switch (provider) {
 		case "openai-codex":
 			return getProviderData(openAiCodexModels, openAiCodexDefaultModelId)
-		default:
+		default: {
+			const selectedModelId =
+				modelId && modelId in openAiCodexModels ? (modelId as keyof typeof openAiCodexModels) : openAiCodexDefaultModelId
 			return {
 				selectedProvider: "openai-codex",
-				selectedModelId: modelId || openAiCodexDefaultModelId,
-				selectedModelInfo: openAiCodexModels[modelId || openAiCodexDefaultModelId],
+				selectedModelId,
+				selectedModelInfo: openAiCodexModels[selectedModelId],
 			}
+		}
 	}
 }
 

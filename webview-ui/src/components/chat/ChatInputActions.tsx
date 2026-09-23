@@ -1,4 +1,4 @@
-import { AtSign, ChevronDown, Mic, MicOff, Paperclip, Plus } from "lucide-react"
+import { AtSign, Mic, MicOff, Paperclip, Plus } from "lucide-react"
 import { memo, useRef, useState } from "react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -8,8 +8,6 @@ interface ChatInputActionsProps {
 	onContextClick: () => void
 	onAttachClick: () => void
 	attachDisabled: boolean
-	modelDisplayName: string
-	onModelClick: () => void
 	isListening?: boolean
 	isSpeechSupported?: boolean
 	onVoiceClick?: () => void
@@ -24,8 +22,6 @@ export const ChatInputActions = memo(
 		onContextClick,
 		onAttachClick,
 		attachDisabled,
-		modelDisplayName,
-		onModelClick,
 		isListening = false,
 		isSpeechSupported = true,
 		onVoiceClick,
@@ -87,16 +83,6 @@ export const ChatInputActions = memo(
 						</button>
 					</PopoverContent>
 				</Popover>
-
-				<button
-					aria-label={`Change model. Current model: ${modelDisplayName}`}
-					className="lumi-composer-model flex min-w-0 max-w-full items-center justify-between gap-1.5 truncate rounded-md border border-border bg-transparent px-2.5 py-1.5 text-left text-xs font-medium text-foreground/75 transition-colors hover:bg-list-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-					onClick={onModelClick}
-					title={`Change model · ${modelDisplayName}`}
-					type="button">
-					<span className="truncate">{modelDisplayName}</span>
-					<ChevronDown className="size-3 text-description/50 shrink-0" />
-				</button>
 
 				{onVoiceClick && isSpeechSupported && (
 					<button
