@@ -1,0 +1,85 @@
+---
+title: "Authorization & Model Selection"
+description: "Configure API credentials for LUMI's four supported providers."
+---
+
+LUMI connects to language models through an **API provider**. This build supports four providers, wired in `src/core/api/index.ts` and listed in `src/shared/providers/providers.json`.
+
+## Supported providers
+
+| Provider | UI label | Credentials |
+|----------|----------|-------------|
+| `openrouter` | OpenRouter | OpenRouter API key |
+| `openai-codex` | ChatGPT Subscription | OpenAI Codex / ChatGPT subscription auth |
+| `nousResearch` | NousResearch | NousResearch API key |
+| `cloudflare` | Cloudflare Workers AI | Account ID + API token |
+
+Unknown provider values fall back to OpenRouter at runtime.
+
+## Setup
+
+<Steps>
+  <Step title="Open LUMI Settings">
+    Click the gear icon in the LUMI sidebar.
+  </Step>
+  <Step title="Select provider(s)">
+    Choose a provider for **Plan** and/or **Act** mode. They can differ.
+  </Step>
+  <Step title="Enter credentials">
+    Paste API keys or complete OAuth for the selected provider. Keys are stored in VS Code secret storage via `StateManager`.
+  </Step>
+  <Step title="Choose a model">
+    Pick a model ID from the provider picker. OpenRouter exposes the largest catalog.
+  </Step>
+  <Step title="Verify">
+    Send a chat message. A streaming response confirms the configuration works.
+  </Step>
+</Steps>
+
+<Note>
+API keys are sent only to the provider you selected. They are not logged by LUMI.
+</Note>
+
+## OpenRouter
+
+1. Create an key at [openrouter.ai](https://openrouter.ai).
+2. In LUMI Settings, set **API Provider** to **OpenRouter**.
+3. Paste the key and select a model (for example Claude, GPT, or Gemini routes).
+
+OpenRouter is the default when routing fails or no provider is set.
+
+## ChatGPT Subscription
+
+1. Set **API Provider** to **ChatGPT Subscription** (`openai-codex`).
+2. Follow the in-app OAuth/sign-in flow (`OpenAiCodexHandler`).
+
+## NousResearch
+
+1. Obtain an API key from NousResearch.
+2. Set provider to **NousResearch** and paste the key.
+
+## Cloudflare Workers AI
+
+1. Create a Cloudflare API token with Workers AI access.
+2. Enter **Account ID** and **API token** in LUMI Settings for the Cloudflare provider.
+
+## Plan vs Act credentials
+
+Plan and Act modes maintain separate provider and model fields in extension state (`planModeApiProvider`, `actModeApiProvider`, and associated model IDs in `src/shared/storage/state-keys.ts`). Configure both if you want read-only planning on a cheaper model and implementation on a stronger one.
+
+## Auth service
+
+Account/OAuth flows for hosted LUMI services (when enabled) go through `src/services/auth/AuthService.ts`. Enterprise on-prem endpoints can be configured via `endpoints.json` (see `src/config.ts`).
+
+## Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| 401 / auth errors | Key valid for selected provider; correct Plan vs Act provider |
+| Model not listed | Refresh models; OpenRouter model ID spelling |
+| Falls back unexpectedly | Provider string must match `providers.json` keys exactly |
+
+## Next
+
+- [Model selection guide](/core-features/model-selection-guide)
+- [Your first project](/getting-started/your-first-project)

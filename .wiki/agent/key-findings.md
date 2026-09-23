@@ -1,0 +1,233 @@
+# Key Findings
+
+## 2026-08-06 Guided Spec Mode (`AUTO` Execution Wrapper v1.0.0-spec)
+
+- **Zero-Syntax Shielding for Non-Technical Stakeholders**: Eliminates prompt fatigue and code/terminal noise for product managers, client approvers, and non-engineering leadership by forcing LLM outputs into 4-block structured product specifications.
+- **Deterministic 4-Phase Lifecycle Engine**: State machine (`DISCOVERY` $\rightarrow$ `SPEC LOCK` $\rightarrow$ `MILESTONE EXEC` $\rightarrow$ `HANDOFF`) enforces 4-block output formats: Block 1 Breadboard Map (`Place`, `Affordances`, `Wiring`), Block 2 Milestone Stepper (`[DONE]`, `[IN PROGRESS]`, `[PENDING]`), Block 3 Decision Waypoint (Question), and Block 4 Decision Chips (`Option A` & `Option B`).
+- **Superhuman Single-Key Keyboard Acceleration (`Press A` / `Press B`)**: Keyboard event listeners in `GuidedSpecCard.tsx` allow instant 1-key decision approvals (`A` for Option A, `B` for Option B) with visual keyboard shortcut badges.
+- **Decision Rationale & Trade-off Matrix**: `Rationale` drawers on decision chips explain *why* Option A is recommended and evaluate trade-offs before approving.
+- **Interactive Live Architecture Canvas**: `🎨 Live Canvas` drawer in `GuidedSpecCard.tsx` expands full surface places, wireframed affordances, and lock metrics.
+- **Automated Rollback Checkpoint**: State 4 (`HANDOFF`) auto-generates a rollback restoration snapshot (`📸 Snapshot Ready`).
+- **Verification Evidence**: `parseGuidedSpecOutput` mocha parser test suite passing (`2/2 passing`), `npm run check-types` clean with 0 errors across extension backend and webview frontend.
+
+
+
+- **100% Multi-Turn Prefix Invariance**: Historical turns ($0..N-1$) remain byte-for-byte invariant across multi-turn agent sessions, eliminating prompt cache invalidation on Cerebras wafer-scale hardware and Gemma models.
+- **BPE Vocabulary Preservation**: Cleans whitespace, CRLF, HTML comments, stack frames, paths, and URLs without introducing artificial shorthand symbols (`st:`, `msg:`, `err:`, `[@diff]`) that shatter Gemma/Cerebras BPE subword tokens.
+- **Multi-Format Reasoning Tag Sanitization**: Strips `<think>`, `<thinking>`, and `<reasoning>` tags cleanly across DeepSeek R1, Qwen R1, Claude, and Gemma models, preventing reasoning trace leakage across turns.
+- **API-Compliant Turn Boundary Snapping**: Context ceiling truncation (`enforceApcStableContextCeiling`) snaps start indices forward to valid `user` roles to guarantee API request schema compliance (`user` role start).
+- **Pre-Unwrap Deduplication**: Single-element text block arrays are unwrapped before deduplication to collapse duplicate user prompts cleanly.
+- **High Ingestion Throughput**: Sub-1.5ms per-session processing latency (~230,000 messages/sec) verified across 30 automated test and benchmark suites (`apc-benchmark.ts` and `apc-pipeline-test.ts`).
+
+## 2026-07-26 Recoverable Turn-Boundary Context Compaction
+
+- **No stream interruption**: passive pruning and complete-pair rollover execute only after the preceding request/tool turn has settled and before a new provider request. The mechanism does not inject a compaction alert or consume an extra model/tool turn.
+- **Immutable recovery identity**: main histories persist `ctx_msg_<uuid>` and `ctx_blk_<uuid>` metadata; v2 projections resolve by those IDs after deletion/reordering. Legacy positional updates are digest-checked and fail closed. IDs are stripped before provider serialization.
+- **Centralized exact recovery**: parent and subagent scopes share BroccoliDB.
+  Exact UTF-8 source is Brotli-compressed when beneficial, deduplicated by
+  SHA-256 in sharded CAS, and described by stable-ID projection rows.
+- **Real publication barrier**: `BufferedDbPool.writeDurableBatch()` executes
+  source → projection → cursor → run rows in one strict caller-ordered SQLite
+  transaction and propagates every failure. Markers are applied only after it
+  resolves and CAS presence is rechecked.
+- **Honest subagent recovery**: subagents use isolated central scopes. The
+  immutable `<transcript>.context/` record remains the fallback for isolated
+  runners without a central store.
+- **One threshold authority**: `context-window-utils.ts` computes monotonic `normal → micro → ast_prune → zero_loss_ledger → emergency` thresholds while preserving the existing provider hard allowance. Custom auto-condense settings are clamped between passive and emergency fences.
+- **Bounded high-throughput passes**: every tier caps scanned messages, inspected/transformed blocks, sampled candidates, and output. Pathological inputs are additionally bounded to 2,000,000 source-analysis characters, 20,000 materialized lines, and 4,096 characters per pattern match while full-source digest/line count remain exact.
+- **Evidence-aware, non-authoritative compression**: deterministic code outlines retain declarations/exports and head/tail context but explicitly may not parse; command projections rank failures, assertions, stack frames, and summaries.
+- **Marker trust boundary**: source text that mimics `<system_context_projection>` is escaped for every request; trusted non-callable markers are reapplied only from internal identity state. A conditional system policy is added only after a trusted marker survives that boundary, and tells the model that projection syntax may be invalid and no rehydration tool exists.
+- **Amortized and restart-aware traversal**: one `ContextManager` spans the
+  governed run, while scan-only and transforming passes persist their two-level
+  cursor in BroccoliDB for scope restoration.
+- **Safety exclusions**: recent turns, short blocks, unknown tools, completion evidence, and mutation outputs remain raw. Higher tiers may refine an earlier projection only when the new form produces a meaningful reduction.
+- **Serialized invisible continuity**: silent rollover preserves retained text byte-for-byte. Same-process ledger writers use a path-keyed mutex plus locked read-merge-write; if identities collide in one legacy positional bucket, lookup filters the mixed update array by UUID. Cross-process ledger writing is explicitly unsupported until an external lock is added.
+- **Verification evidence**: the focused context/pruner/identity-state run passed
+  67 tests, the real LUMI-to-BroccoliDB bridge passed, the complete subagent
+  suite passed 20 tests, and BroccoliDB compaction plus capability contracts
+  passed. Native coverage includes compression, deduplication, scan cursor
+  restore, GC live roots, corruption quarantine, rollback on central failure,
+  shifted-ID recovery, forged markers, pathological inputs, and partial-stream
+  isolation.
+
+## 2026-07-24 MoD Upstream Grounded Investigation & Strict Downstream Resolution
+
+- **Golden Invariant Rule**: Implementation subagents must NEVER be handed arbitrary downstream file boundaries that were not explicitly inspected and selected during the design investigation phase.
+- **Zero Downstream Guessing (`MixtureOfDesignersOrchestrator.ts`)**: Reverted downstream target resolution probing. If an ungrounded decision (e.g. `target: "General"`) reaches task generation without evidence or refinement file bindings, the orchestrator acts as a strict invariant gatekeeper, throws `TargetResolutionException("TARGET_RESOLUTION_FAILED")`, and safely transitions state to `blocked`.
+- **Upstream Grounded Investigation (`ProblemClassifier.ts`, `DesignerInResidence.ts`)**: Embedded physical workspace file probing (`probeWorkspaceFile()`) directly into the Design Investigation Phase. Problem classifications and design decisions come out pre-attached to real inspected workspace files (`.tsx`, `.ts`, `.vue`, `.css`, etc.).
+- **Terminal State Leak Fix**: Added `"blocked"` to `MoDStage` union in `types.ts` and `SubagentStatusRow.tsx`, preventing target resolution blocks from leaking into `completed-with-limitations`.
+- **Verification Evidence**: 66 Mocha unit tests passed cleanly with 0 failures (`src/core/task/tools/subagent/__tests__/mod.test.ts`).
+
+## 2026-07-25 Master of Design (MoD) System Prompt Steering Toggle Architecture
+
+- **Unified Task Loop & 100% Tool Parity**: Centralized MoD execution into a system prompt steering toggle (`modEnabled`). MoD Mode runs through the standard task loop with 100% tool parity (`read_file`, `replace_in_file`, `execute_command`, `browser_action`, subagents, MCP tools).
+- **6 Senior Design Engineering Steering Pillars**: Automatically injects Design Token Sensing, Complete 7-State UI Matrix, WCAG 2.1 AA Accessibility, Visual Aesthetics, Responsive Layout Ergonomics, and 5-Whys Cognitive Analysis directly into system prompts via `mod_designer_steering.ts`.
+- **Optimal Attention Placement**: `PromptBuilder.ts` dynamically places `MOD_DESIGNER_STEERING` right after `AGENT_ROLE_SECTION` across all model prompt variants for maximum model attention weighting.
+- **Subagent Swarm Propagation**: `SubagentRunner.ts` extracts `modEnabled` from state settings and threads `modEnabled: true` into subagent `SystemPromptContext`, enabling subagent swarms to inherit senior designer instincts.
+- **Slash Command Integration**: Threads `modEnabled` context into slash commands such as `/deep-planning`.
+- **Non-Technical UX Ergonomics**: Switcher pill (`ModModeSwitcher.tsx`) with zero-jargon copy, keyboard arrow navigation (`ArrowLeft` / `ArrowRight`), popover mode guides, and Vercel v0 / Cursor style design tokens.
+- **Verification Evidence**: `npx tsc --noEmit` passed with 0 errors; Mocha unit tests (`mod.test.ts`) and Vitest UI tests (`ModModeSwitcher.test.tsx`) passed 100%.
+
+## 2026-07-18 Transaction-Split Completion Saga and Committed Boundary Migration
+
+- **Decisive Boundary Enforcement**: Refactored completion tool execution to prevent nested execution permit leaks. The `AttemptCompletionHandler` immediately returns a typed continuation outcome (releasing its execution permit and committing the terminal execution event) before any validation commands or user prompts are run.
+- **Completion Saga Coordinator (`CompletionSagaCoordinator.ts`)**: Introduced a dedicated coordinator to consume the committed terminal execution event, verify that the originating permit is released, and manage the sibling validation command and user prompts under fresh sibling permits.
+- **Idempotent Concurrency Control (`evidence_dispatching`)**: Added the `evidence_dispatching` attempt state with atomic CAS claims to eliminate races between `consume()` and `reconcileForTask()`.
+- **Startup Recovery & Reconciliation**: Integrates automatic completion saga reconciliation in `prepareResumeLifecycle` to recover from crashes mid-completion.
+- **Clean Repository Decoupling**: Replaced raw SQL queries and synchronous database getters with narrow async repository methods (`loadTerminalExecutionEvent` and `getCompletionAttempt`), removing all synchronous database hooks.
+
+## 2026-07-18 Transactional Task Lifecycle Migration
+
+- `src/core/task/lifecycle/TaskLifecycleFunnel.ts` is the sole production task lifecycle mutation authority. Registration, activation, suspension, resume/replacement, cancellation request/settlement, completion, failure, timeout, and parent-to-child propagation are typed, generation-bound transitions.
+- The authoritative model separates `registered | active | suspended | terminal` from terminal outcome `completed | cancelled | failed | timed_out`. Cancellation is a `none | requested` substate, so request and settlement cannot be collapsed into contradictory booleans.
+- SQLite commits the current record and immutable event together under `BEGIN IMMEDIATE`, generation/revision compare-and-swap, parent constraints, and one global monotonic sequence. Restoration validates both full schemas and their exact record/event relationship; missing, malformed, contradictory, or mismatched data fails closed. Publication and task/webview projection happen only after commit.
+- `TaskState.executionGeneration` and `abort` are read-only lifecycle projections. Direct `isTerminalState`, `didFinishAbortingStream`, `abandoned`, generation assignments, cancellation assignments, UI repair, and storage restoration bypasses were removed.
+- `CompletionFunnel` remains the semantic durable completion authority and submits one `SettleCompletion` fact. `ExecutionFunnel` queries lifecycle eligibility before dispatch. Neither writes task lifecycle fields.
+- Parent, sibling, and subagent work shares one lifecycle authority. Attached child registration binds the exact parent generation; parent cancellation/failure/timeout propagates as typed events; parent completion/replacement waits for active attached children.
+- Attached-child admission revalidates the durable parent generation. If a process stops between the parent commit and a child propagation commit, the child remains fenced and parent restoration reconciles it through the same typed transition.
+- Terminal generations are monotonic. A suspended generation may resume explicitly; a terminal generation requires a new identifier. Old callbacks, permits, and intents cannot cross the generation replacement.
+- `scripts/check-task-lifecycle-boundary.mjs` prevents production lifecycle projection writes, generation/cancellation setters, lifecycle-table mutation outside approved authority files, alternate funnel construction/binding, and production use of the internal persistence or in-memory test authority.
+- JoyRide lifecycle registration and the subagent lane state machine are intentionally retained as cache/scheduling mechanisms. They do not own task state and must not be migrated into the lifecycle funnel.
+
+### Verification evidence
+
+- Broad host unit suite: 2,214 passing, 4 expected environment-dependent pending, 0 failures.
+- Lifecycle/execution/completion authority matrix: 64 passing; parent/sibling/subagent parity matrix: 77 passing.
+- Webview suite: 173 passing, including lifecycle-only terminal status and action presentation.
+- VS Code integration suite: 593 passing. Its existing mock-auth `getSecretKey is not a function` warnings remain non-fatal and unrelated to lifecycle.
+- TypeScript, lint, handler and lifecycle boundary checks, roadmap audit, CI build, production prepublish, agent-doc branding/links, README/doc metrics, and `git diff --check`: passed.
+- The repository-wide Mintlify checker retains the pre-existing baseline of 145 broken links in 37 legacy files; it reports none in the new task lifecycle, cancellation, resume, or ADR pages.
+
+## 2026-07-18 Central Execution Funnel Migration
+
+- `src/core/task/tools/execution/ExecutionFunnel.ts` is the sole approval and tool-execution authority. One auditable monolith owns invocation registration, pure intent preparation, task/lane/policy admission, approval settings, command safety, automatic approval, explicit prompting, the one immutable decision, decision-linked permit issuance, dispatch, reliability, and terminal classification.
+- Parent `ToolExecutor`, sibling scheduling, and governed subagent runners now enter the same funnel. `ToolExecutorCoordinator` is a registry only. Direct dispatch fails without the current permit matching task, generation, invocation, and approval decision.
+- The shared schema-v2 `ExecutionFunnelEvent` is the one modern execution projection. It freezes the approval intent, applicable policy/settings inputs, prompt fact, actor/mechanism decision, permit relationship, task generation, lane, outcome, and ordered stage trace. Task state keeps the current event plus a bounded terminal history; sibling contexts, subagent transcripts, and envelopes carry the same event.
+- Concurrent and sequential invocation replays are rejected before a second dispatch. A resumed task starts a new execution generation and clears stale per-turn projections; decisions, permits, and asynchronous child work cannot cross generations.
+- Successful-result enrichment settles before terminal success. Handler prose is evidence rather than status, and governed subagent tool-step records now require a terminal execution event instead of accepting legacy-shaped artifacts.
+- Turn stream control consumes only the current-generation event. The legacy `didRejectTool` and `didAlreadyUseTool` booleans and unused `autoApproveAllToggled` setting were deleted, so no fallback state can compete with the modern event. Subagent tool budgets remain governed by their lane limit rather than inheriting the parent's single-tool presentation budget.
+- The former `autoApprove.ts` unconditional authority, `ToolExecutor` approval helpers, coordinator dispatch wrapper, handler-local settings/prompts/decision recording, `ToolResultUtils` approval helper, subagent shortcuts, reliability approval recorder, and legacy settings fields were removed. Every registered handler must implement a synchronous, configuration-free `getApprovalIntent()`; there is no missing-intent fallback.
+- Composite Golden Cartridge operations dispatch through the funnel under the parent permit. Each delegated intent must be covered by the frozen parent intent, and commands must be declared exactly before approval; discovery cannot silently expand side effects after admission.
+- Conditional mutation collision paths are derived from the frozen intent inside the funnel. The handler boundary check now rejects approval-setting reads, approval helpers/decisions, permit ownership, approval UI, and non-semantic handler prompts.
+- Reliability is subordinate to an active permit. Circuit state is task scoped, shell process timeout/cancellation remains in `CommandExecutor`, and the funnel cannot retry a live shell process. A tool's `operation_succeeded` event never means the task is complete; `CompletionFunnel.ts` remains the separate sole task-completion authority.
+
+### Verification evidence
+
+- Expanded execution-focused parent/sibling/subagent/storage/registration regression matrix: 154 passing.
+- Broad unit suite: 2,180 passing, 4 expected pending, 0 failures.
+- `npm run check-types`, `npm run lint`, `npm run check:handler-imports`, `npm run ci:build`, `npm run vscode:prepublish`, and agent-document link/branding checks passed. `git diff --check` is part of the final handoff audit.
+- The repository-wide Mintlify link checker still reports its pre-existing corpus of 145 broken links across unrelated documentation; none are reported in the rewritten central execution funnel reference.
+
+## 2026-07-18 Central Completion Funnel Migration
+
+- `src/core/task/tools/completion/CompletionFunnel.ts` is the sole completion authority. One auditable monolith now owns the entire funnel: evidence collection, registry-ordered stage trace, gate decision, action guard, canonical digest, lease-fenced SQLite compare-and-swap, event publication, cache monotonicity, roadmap/swarm checks, and terminal classification.
+- The durable `task_completions` row is the terminal fact. The shared `CompletionFunnelEvent` is its one modern projection across task state, message history, subagent envelopes, and webview status. Consumers select a whole newest event; they never merge fields from competing projections.
+- Terminal success is monotonic: `phase: completed`, `kind: completed`, `nextAllowedAction: none`, and `attempt_completion` is forbidden. Generic resume markers and bookkeeping cannot demote it to pending; only explicit new user work can reopen a completed task.
+- `AttemptCompletionHandler` is now an adapter around `runCompletionFunnelAttempt()`. The former lifecycle decision engine, snapshot builder, action guard, gate registry/evaluator, canonical lifecycle projection, receipt validation, and legacy webview panel were deleted rather than retained as compatibility authorities.
+- `ToolExecutor` no longer runs a pre-handler completion circuit breaker. There is no second interception point before the funnel, and advisory diagnostic counters cannot acquire action authority.
+- `FinalizationRunner` is limited to optional post-completion Knowledge Ledger maintenance. It cannot authorize, reject, reopen, seal, or publish task completion, so documentation state cannot compete with the durable completion fact.
+
+### Verification evidence
+
+- Completion-focused root regression set: 141 passing.
+- Webview suite: 171 passing.
+- Broad unit matrix: 2,161 passing and 4 expected pending with the timing-sensitive governed-execution file excluded; that file passes 20/20 in isolation (2,181 passing total).
+- `npm run check-types`, `npm run lint`, `npm run check:handler-imports`, `npm run ci:build`, and `git diff --check`: passed.
+
+## 2026-07-18 Lease Reconciliation and Terminalization Pass
+
+- Production coordination has one authority: SQLite. `local_test` is explicit and immutable; connection/query failure surfaces `DATABASE_AUTHORITY_UNAVAILABLE` and never falls back to memory or files.
+- Lease epochs and fencing tokens are generated atomically in `swarm_lock_generations`, stored as decimal `TEXT`, and carried through TypeScript as strings. Tests cover tokens above `Number.MAX_SAFE_INTEGER`.
+- Acquisition persists SQLite first and then creates file, Broccoli, and memory projections. Release performs an exact-tuple SQLite delete first; later projection cleanup failure is logged without restoring the database row.
+- File and Broccoli release parse records before unlinking and validate owner, epoch, token, and mode. Future `expiresAt` wins over age; malformed JSON and clock skew are structured corruption and fail closed.
+- Normal reconciliation requires a database-available snapshot. The isolated `AdministrativeLockCleaner` is the only ownership override and requires a logged reason.
+- Deadlock analysis uses typed wait edges and Tarjan SCCs from immutable scheduler/lane snapshots. Timers, expiring leases, resolvable outside owners, and unrelated capacity holders prevent false deadlock classification. Recovery is discarded if either state version changed.
+- Completion decisions use a schema-versioned canonical SHA-256 identity and commit one `task_completions` row under `BEGIN IMMEDIATE`, verifying the live lease, freshest generation, and unchanged task state version.
+- Restart delivery is idempotent; same-outcome duplicates are suppressed; terminal conflicts and same-ID/different-payload collisions fail closed.
+- ACT prompts now expose only workspace/task, next required action, hard blockers, aggregate lane progress, and completion condition. Raw tokens, counters, and advisory warnings remain outside the model decision surface.
+
+### Verification evidence
+
+- Focused coordination/liveness/completion and governed execution regression set: 210 passing.
+- Broad unit suite: 2,373 passing, 4 expected pending.
+- `npx tsc --noEmit --pretty false`, `npm run lint`, protobuf lint, handler-import checks, and `git diff --check`: passed.
+- Restored the Electron-native `better-sqlite3` build with `npm run rebuild:electron:better-sqlite3` after Node-based database tests.
+
+## 2026-07-15 Subagent Concurrency and Scoped Cancellation Pass
+
+- Scoped command cancellation via `ownerId` prevents cross-contamination of concurrent subprocesses. `CommandExecutor` independent tracking ensures cancellations target the correct processes and preserves cancellation authority across terminal acquisition races.
+- Lane admission in `UseSubagentsToolHandler` now tracks pool execution slots (`running.size`) rather than yielded lifecycle states (`activeLaneExecutions`), avoiding premature queue saturation when multiple lanes start in a single tick.
+- Fetching parent context asynchronously as a promise removes context retrieval from the critical subagent lane admission path, ensuring faster startup times.
+- Resuming swarms requires checking that the source governed receipt is sealed and has valid integrity with a matching checksum. Missing or unsealed receipts result in restart rather than unsafe work reuse.
+- Tool repetition checks (`MAX_CONSECUTIVE_IDENTICAL_CALLS = 3`) identify stuck subagents, inject self-correction nudges to re-evaluate parameters, and notify the parent swarm of toxic hotspots.
+- Transcript flushes use atomic temporary files renamed on success to prevent corruption under deferred write-behind scheduling. Published envelopes require transcript durability.
+
+## 2026-07-13 I/O Hyper-Execution Pass
+
+- Cold path/authority work dominated scheduler-ready-to-backend-start for one small read: 1.362 ms of a 2.396 ms local fixture trace. Warm generation reuse reduced that path to 0.114 ms and the complete handoff to 0.157 ms with no filesystem calls.
+- Read extraction previously performed `access` plus pathname metadata plus another open. It now uses one `open` → descriptor `stat` → bounded read, with a UTF-8 fast path and byte-correct truncation.
+- Recursive listing's directory expansion caused 144 `stat` calls in the fixture. Deterministic bounded breadth-first traversal removes them, snapshots repository ignore evidence once, and emits the first page before completion.
+- Search buffered the entire child output and handler cache preflight could cost more than a small `rg` invocation. Search now directly spawns the resolved executable, parses bounded JSON incrementally, caches executable/static state, coalesces identical requests, and kills/joins its owned child on cancellation.
+- Coalescing occurs before class-budget acquisition, so identical waiters consume one backend slot. The global scheduler limit remains four; search and traversal backend classes are capped at two rather than raising the global fan-out.
+- Authority and result caches carry workspace, filesystem, and policy generations. Late old-generation completions cannot enter the current generation, while external-path and approval evidence is never cached.
+- Direct single-tool I/O now shares task cancellation with sibling I/O, is joined during abort, and performs a post-backend abort check before read history or result projection. Multi-root search failure aborts and joins sibling search workers and rejects rather than caching a false empty result.
+- `apply_patch` policy targets are parsed after mutation; opaque mutating shell/MCP work reloads ignore policy before the next read. Bounded verification commands skip both the reload and result-generation rotation.
+- The final result envelope no longer JSON-serializes the full payload merely to detect failure. Invocation result/presentation arrays become immutable, canonical projection writes directly by sequence, and advisory presentation cannot gate projection.
+
+### Deterministic local-fixture evidence
+
+These values are development-fixture measurements, not production telemetry; “cold” clears task caches but does not control the OS page cache. The ten service rows stress backends directly; the runtime total/class caps are verified separately with controlled pool tests.
+
+| Workload | Before | After | Dominant effect |
+| :--- | ---: | ---: | :--- |
+| One cold small read | 4.438 ms | 1.102 ms | one open/fstat/read path |
+| Large-tree list, cold | 28.430 ms | 18.247 ms | 144 metadata calls removed |
+| Large-tree list, warm | 15.288 ms | 6.295 ms | reused ignore/static state |
+| Four cold searches: first result | 65.224 ms | 7.437 ms | incremental output exposure |
+| Repeated warm search | 15.008 ms | 0.136 ms | 8 cache hits, 0 spawns |
+| Search cancellation settlement | 7.932 ms | 1.161 ms | signal → kill → close ownership |
+
+The 577-file, ten-workload final run left active handles unchanged (`2 → 2`). Focused I/O/scheduler tests: 123 passing; TypeScript, targeted Biome, handler-import audit, and the broad unit command pass.
+
+## 2026-07-12 Throughput Pass
+
+- Every tool previously awaited the environment forensic probe even though its result did not authorize or reject the tool. Tool dispatch now proceeds while the advisory probe runs in the background.
+- Initial API requests waited up to 10 seconds for MCP connection. The bounded admission wait is now 1 second; partial MCP degradation no longer prevents the first request.
+- Task admission synchronously persisted intent classification, initialized roadmap lifecycle with possible workspace mutation, and recorded environment history. These bookkeeping operations now run off the critical path; admission does not auto-bootstrap `ROADMAP.md`.
+- Workspace-local read/list/search/definition tools previously entered manual approval when auto-approval was disabled. They now reuse task authority after `.dietcodeignore` validation; external paths retain approval.
+- Completion readiness evaluated the same roadmap dry-run twice. It now consumes one canonical evaluation.
+- Completion audit reconstructed grounded task context from the database and synchronously waited for two persistence writes. Grounded context skips the read, audit evidence persists asynchronously, and the two writes use one batch.
+- Roadmap progress log write failures previously rejected lifecycle calls. They now fail open with a 60-second retry circuit.
+- Successful environment-changing commands previously failed to revoke the environment lease because the tuple's `userRejected` flag was interpreted backwards. The lease and workspace cache now invalidate after successful execution.
+
+## Verification Evidence
+
+- TypeScript: clean via `npx tsc --noEmit --pretty false`.
+- Focused sibling/latency/cache, command, and completion-persistence suites: all passing; deterministic scheduler workloads complete in milliseconds.
+- Full unit suite after both throughput passes: 2,263 passing in about 1 minute, with 4 expected pending tests.
+- Full lint and handler-import audit: passed.
+- Roadmap production audit: passed via `npm run roadmap:audit`.
+
+## 2026-07-12 Sibling Concurrency Pass
+
+- The exact serialization point was `Task.presentAssistantMessage()`: one presenter lock awaited each complete tool, advanced one cursor, and recursively admitted the next. The stream loop also awaited that presenter after every chunk, so the existing four-slot I/O bulkhead never received concurrent callers.
+- Native tool deltas used one mutable `lastToolCall`; interleaved sibling indexes could inherit another call's ID/name. State is now isolated by tool-call index and emits a stable `call_id`.
+- When parallel calling is enabled, complete contiguous sibling groups larger than one enter a bounded dependency batch. Local read/read and bounded verification/read work overlap. Every classified mutation shares a task-wide mutation claim; unknown tools, mutating commands, and interactive operations remain conservatively ordered.
+- Tool result blocks are invocation-local for scheduled children. Presentation events are captured per invocation for workspace-local queries; non-query and interactive presentation remains shared. Execution may finish out of order, while the batch replays captured query UI and appends results in model-emission order.
+- Query-only finalized native batches can start before usage bookkeeping and assistant-history persistence, then join in a `finally` barrier. Cancellation aborts the scheduler, cancels queued work, and awaits scheduler `run` promises; prompt backend interruption depends on signal support.
+- Foreground command activity is now reported by `CommandExecutor`; cancellation calls the host process termination hook immediately instead of sleeping 300 ms for presentation. The VS Code process sends Ctrl+C and releases its command waiter.
+- Task-local monotonic evidence now covers admission, first token/tool/progress/I/O, sibling queue/start/completion, canonical completion, visible result, and deferred persistence. Recording is bounded and fail-open.
+- Cache keys include resolved target, tool, generation, query/regex, `file_pattern`, and list recursion where applicable. Local mutation replaces the task coalescer. An old-generation in-flight result can populate only its old coalescer object, not the replacement generation.
+
+### Deterministic workload evidence
+
+| Workload | Sequential estimate | Concurrent wall | Max concurrency |
+| :--- | ---: | ---: | ---: |
+| Four file reads | 280 ms | 100 ms | 4 |
+| Two reads + two searches | 290 ms | 100 ms | 4 |
+| Diagnostic + safe test command | 220 ms | 140 ms | 2 |
+| Mutation + two disjoint reads | 230 ms | 120 ms | 3 |
+| Overlapping mutations | 200 ms | 200 ms | 1 |
+| One failed sibling + two successes | 190 ms | 100 ms | 3 |
+
+These are fake-clock scheduler fixtures, not extension-host measurements. All workloads start simulated useful I/O at 0 ms, use zero queue wait when independent, preserve sequence-ordered envelopes, and retain partial successes. The cooperative cancellation fixture stops one active and two queued siblings with 0 ms fake-clock latency and leaves no fixture timer pending.

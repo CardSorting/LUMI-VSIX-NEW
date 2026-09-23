@@ -1,0 +1,29 @@
+---
+title: "Running Models Locally"
+description: "Local model status in this LUMI build."
+---
+
+<Warning>
+**Not wired in this build.** `buildApiHandler` in `src/core/api/index.ts` only registers OpenRouter, ChatGPT Subscription, NousResearch, and Cloudflare Workers AI. Ollama and LM Studio handler files exist under `src/core/api/providers/` but are not connected to the provider dropdown (`src/shared/providers/providers.json`).
+
+Use **OpenRouter** with a local OpenAI-compatible endpoint if you need self-hosted inference, or extend `createHandlerForProvider` to register Ollama/LM Studio.
+</Warning>
+
+## Handler files present (not active)
+
+| Provider | Handler file |
+|----------|--------------|
+| Ollama | `src/core/api/providers/ollama.ts` |
+| LM Studio | `src/core/api/providers/lmstudio.ts` |
+
+Settings UI components exist under `webview-ui/src/components/settings/providers/` for when these providers are re-enabled.
+
+## See also
+
+- [Model selection guide](/core-features/model-selection-guide)
+- [Authorizing](/getting-started/authorizing-with-dietcode)
+
+Legacy setup guides for Ollama and LM Studio are kept for reference:
+
+- [Ollama (legacy)](/running-models-locally/ollama)
+- [LM Studio (legacy)](/running-models-locally/lm-studio)

@@ -1,0 +1,77 @@
+---
+title: "Quick Start"
+sidebarTitle: "Quick Start"
+description: "Get LUMI running in under 2 minutes."
+---
+
+LUMI is an AI coding assistant inside VS Code. You describe work in plain language; LUMI plans, proposes file edits and commands, and waits for your approval before changing anything.
+
+<Info>
+  **What you'll need:**
+  - **VS Code** or **Cursor** (VS Code–compatible)
+  - An API key for one supported provider, or a LUMI account token if using hosted routing
+  - ~2 minutes
+</Info>
+
+## 1. Install
+
+<Tabs>
+  <Tab title="VS Code / Cursor">
+    Open Extensions (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **LUMI**, install `CardSorting.lumi`.
+
+    Or install from a VSIX:
+
+    ```bash
+    code --install-extension lumi-1.0.3.vsix
+    ```
+  </Tab>
+  <Tab title="From source">
+    ```bash
+    npm run install:all
+    npm run package
+    code --install-extension dist/*.vsix
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+See [Installing LUMI](/getting-started/installing-dietcode) for VSIX paths, dev mode, and troubleshooting.
+</Tip>
+
+## 2. Configure a provider
+
+Open the LUMI sidebar → **Settings** → pick a provider for Plan and/or Act mode:
+
+| Provider | What you need |
+|----------|---------------|
+| OpenRouter | OpenRouter API key |
+| ChatGPT Subscription | OpenAI Codex auth |
+| NousResearch | NousResearch API key |
+| Cloudflare Workers AI | Account ID + API token |
+
+[Full authorization guide →](/getting-started/authorizing-with-dietcode)
+
+## 3. Run a task
+
+Open a project folder, focus the LUMI chat input (`Cmd+'` / `Ctrl+'` when nothing is selected), and send:
+
+```text
+Create a Python function that checks if a string is a palindrome. Include tests.
+```
+
+LUMI will propose a plan, create files, and ask you to **Approve** each write or command.
+
+## 4. Useful shortcuts
+
+| Action | Shortcut |
+|--------|----------|
+| Add selection to chat | `Cmd+'` / `Ctrl+'` (with editor selection) |
+| Focus chat input | `Cmd+'` / `Ctrl+'` (no selection) |
+| New task | Sidebar **+** button or `/newtask` |
+| Compact context | `/compact` or `/smol` |
+
+## Next steps
+
+- [Your first project](/getting-started/your-first-project)
+- [Plan & Act modes](/core-workflows/plan-and-act)
+- [All tools reference](/tools-reference/all-dietcode-tools)

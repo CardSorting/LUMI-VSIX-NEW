@@ -1,0 +1,16 @@
+# Default reviewers for pull requests.
+# Update when public maintainer handles are finalized.
+
+* @CardSorting
+
+# GitHub automation and CI
+/.github/ @CardSorting
+
+# Governed execution + high-risk surfaces
+/src/core/task/tools/subagent/ @CardSorting
+/src/shared/subagent/ @CardSorting
+# High-traffic docs
+/README.md @CardSorting
+/docs/governed-subagent-execution.md @CardSorting
+/docs/governed-roadmap-projection-quickref.md @CardSorting
+/SECURITY.md @CardSorting

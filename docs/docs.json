@@ -1,0 +1,684 @@
+{
+	"$schema": "https://mintlify.com/docs.json",
+	"theme": "mint",
+	"name": "LUMI",
+	"description": "Calm coding companion — agentic pair programming for VS Code.",
+	"colors": {
+		"primary": "#9D4EDD",
+		"light": "#F0E6FF",
+		"dark": "#000000"
+	},
+	"logo": {
+		"light": "/assets/lumi-logo.png",
+		"dark": "/assets/lumi-logo.png"
+	},
+	"favicon": {
+		"light": "/assets/lumi-favicon.png",
+		"dark": "/assets/lumi-favicon.png"
+	},
+	"background": {
+		"color": {
+			"light": "#fafaf9",
+			"dark": "#0f0f0f"
+		}
+	},
+	"styling": {
+		"eyebrows": "breadcrumbs",
+		"codeblocks": "system",
+		"css": "styles.css"
+	},
+	"appearance": {
+		"default": "system",
+		"strict": false
+	},
+	"fonts": {
+		"family": "Geist Sans"
+	},
+	"navbar": {
+		"links": [
+			{
+				"label": "GitHub",
+				"icon": "github",
+				"href": "https://github.com/CardSorting/LUMI"
+			}
+		],
+		"primary": {
+			"type": "button",
+			"label": "Install LUMI",
+			"href": "/getting-started/installing-dietcode"
+		}
+	},
+	"navigation": {
+		"tabs": [
+			{
+				"tab": "Getting Started",
+				"icon": "rocket",
+				"groups": [
+					{
+						"group": "Home",
+						"pages": [
+							"home",
+							"getting-started/quick-start"
+						]
+					},
+					{
+						"group": "Getting Started",
+						"pages": [
+							"getting-started/what-is-dietcode",
+							"THE_DIETCODE_EDGE",
+							"getting-started/installing-dietcode",
+							"getting-started/authorizing-with-dietcode",
+							"getting-started/your-first-project",
+							"getting-started/glossary"
+						]
+					}
+				]
+			},
+			{
+				"tab": "User Guide",
+				"icon": "book-open-reader",
+				"groups": [
+					{
+						"group": "Core Workflows",
+						"pages": [
+							"core-workflows/task-management",
+							"core-workflows/plan-and-act",
+							"core-workflows/working-with-files",
+							"core-workflows/using-commands",
+							"core-workflows/checkpoints"
+						]
+					},
+					{
+						"group": "Core Features",
+						"pages": [
+							"features/focus-chain",
+							"features/auto-approve",
+							"features/auto-compact",
+							"features/multiroot-workspace",
+							"features/subagents",
+							"mixture-of-designers",
+							"core-features/guided-spec-mode",
+							"features/roadmap-steering",
+							"features/roadmap-auto-governance-postmortem",
+							"features/background-edit",
+							"features/jupyter-notebooks",
+							"features/deep-planning",
+							"features/web-tools",
+							"features/worktrees",
+							"features/storage-and-cache-management"
+						]
+					},
+					{
+						"group": "Customization",
+						"pages": [
+							"customization/overview",
+							"customization/cline-rules",
+							"customization/skills",
+							"customization/workflows",
+							"customization/hooks",
+							"customization/clineignore"
+						]
+					},
+					{
+						"group": "Tools Reference",
+						"pages": [
+							"tools-reference/README",
+							"tools-reference/all-dietcode-tools",
+							"tools-reference/browser-automation",
+							"tools-reference/golden-cartridge"
+						]
+					},
+					{
+						"group": "Troubleshooting",
+						"pages": [
+							"troubleshooting/extension-wont-start",
+							"troubleshooting/terminal-quick-fixes",
+							"troubleshooting/networking-and-proxies",
+							"troubleshooting/task-history-recovery"
+						]
+					}
+				]
+			},
+			{
+				"tab": "Advanced",
+				"icon": "bolt",
+				"groups": [
+					{
+						"group": "AI & Reasoning",
+						"pages": [
+							"features/intent-grounding",
+							"multi-agent-system",
+							"features/memory-bank",
+							"hyper-cognition/MAS_ARCHITECTURE"
+						]
+					},
+					{
+						"group": "Security & Stability",
+						"pages": [
+							"SECURITY_BEST_PRACTICES",
+							"CODEBASE_STANDARDS",
+							"STABILITY_REPORT",
+							"ARCHITECTURAL_ENFORCEMENT_HARDENING"
+						]
+					},
+					{
+						"group": "Agents & Memory",
+						"pages": [
+							"WORKING_WITH_SUBAGENTS",
+							"MEMORY_AND_REASONING"
+						]
+					}
+				]
+			},
+			{
+				"tab": "Architecture",
+				"icon": "compass-drafting",
+				"groups": [
+					{
+						"group": "System Architecture",
+						"pages": [
+							"AGENT_STACK",
+							"EVOLUTION",
+							"architecture/current",
+							"architecture/adr-001-token-ingestion-buffer-engine",
+							"PROJECT_MAP",
+							"CODE_TO_DOC_MAP",
+							"SYSTEM_COMMUNICATION",
+							"grpc-subscription-persistence",
+							"MEMORY_AND_REASONING",
+							"WORKING_WITH_SUBAGENTS",
+							"SECURITY_BEST_PRACTICES",
+							"CODEBASE_STANDARDS",
+							"USER_INTERFACE_DESIGN",
+							"MIRA_UX_IMPLEMENTATION"
+						]
+					},
+					{
+						"group": "Execution & Completion Authority",
+						"pages": [
+							"task-lifecycle-authority",
+							"task-cancellation",
+							"task-resume-recovery",
+							"completion-lifecycle-decision-engine",
+							"completion-gate-lifecycle-migration",
+							"parent-thread-execution-authority",
+							"governed-execution-authority",
+							"governed-execution-runbook",
+							"governed-execution-decisions",
+							"governed-execution-schema",
+							"governed-subagent-execution",
+							"execution-envelope-migration"
+						]
+					},
+					{
+						"group": "Papers (Agent Layer)",
+						"pages": [
+							"papers/companion-brief",
+							"papers/philosophy",
+							"papers/whitepaper",
+							"papers/token-buffer-companion-brief",
+							"papers/token-buffer-philosophy",
+							"papers/token-buffer-whitepaper",
+							"papers/golden-cartridge-brief",
+							"papers/golden-cartridge-philosophy",
+							"papers/golden-cartridge-whitepaper"
+						]
+					},
+					{
+						"group": "Documentation Guide",
+						"pages": [
+							"DOCS_GUIDE",
+							"MAINTAINER"
+						]
+					},
+					{
+						"group": "Contributing",
+						"pages": [
+							"contributing/documentation-guide",
+							"contributing/doc-templates"
+						]
+					}
+				]
+			},
+			{
+				"tab": "Integrations",
+				"icon": "plug",
+				"groups": [
+					{
+						"group": "Models & Providers",
+						"pages": [
+							{
+								"group": "Choosing & Configuring Models",
+								"pages": [
+									"core-features/model-selection-guide",
+									"model-config/context-windows"
+								]
+							},
+							{
+								"group": "Running Models Locally",
+								"pages": [
+									"running-models-locally/overview",
+									"running-models-locally/ollama",
+									"running-models-locally/lm-studio"
+								]
+							},
+							{
+								"group": "Cloud Providers",
+								"pages": [
+									"provider-config/README",
+									"provider-config/galx",
+									"provider-config/openrouter",
+									"provider-config/anthropic",
+									"provider-config/asksage",
+									"provider-config/baseten",
+									"provider-config/cerebras",
+									"provider-config/claude-code",
+									"provider-config/deepseek",
+									"provider-config/doubao",
+									"provider-config/fireworks",
+									"provider-config/gcp-vertex-ai",
+									"provider-config/google-gemini",
+									"provider-config/groq",
+									"provider-config/huawei-cloud-maas",
+									"provider-config/huggingface",
+									"provider-config/minimax",
+									"provider-config/mistral-ai",
+									"provider-config/moonshot",
+									"provider-config/nebius",
+									"provider-config/nousresearch",
+									"provider-config/openai",
+									"provider-config/openai-codex",
+									"provider-config/openrouter",
+									"provider-config/oracle-code-assist",
+									"provider-config/qwen-code",
+									"provider-config/sambanova",
+									"provider-config/together",
+									"provider-config/xai-grok",
+									"provider-config/zai",
+									{
+										"group": "AWS Bedrock",
+										"pages": [
+											"provider-config/aws-bedrock/api-key",
+											"provider-config/aws-bedrock/iam-credentials",
+											"provider-config/aws-bedrock/cli-profile"
+										]
+									}
+								]
+							}
+						]
+					},
+					{
+						"group": "MCP (Extending DietCode)",
+						"pages": [
+							"mcp/mcp-overview",
+							"mcp/mcp-marketplace",
+							"mcp/adding-and-configuring-servers",
+							"mcp/mcp-server-development-protocol",
+							"mcp/connecting-to-a-remote-server",
+							"mcp/mcp-transport-mechanisms"
+						]
+					}
+				]
+			},
+			{
+				"tab": "Enterprise",
+				"icon": "building",
+				"groups": [
+					{
+						"group": "Enterprise Solutions",
+						"pages": [
+							"enterprise-solutions/overview",
+							"enterprise-solutions/onboarding",
+							"enterprise-solutions/sso-setup",
+							"enterprise-solutions/team-management/managing-members",
+							{
+								"group": "SaaS Provider Configuration",
+								"pages": [
+									"enterprise-solutions/configuration/remote-configuration/overview",
+									{
+										"group": "AWS Bedrock",
+										"pages": [
+											"enterprise-solutions/configuration/remote-configuration/aws-bedrock/admin-configuration",
+											"enterprise-solutions/configuration/remote-configuration/aws-bedrock/member-configuration"
+										]
+									},
+									{
+										"group": "LiteLLM",
+										"pages": [
+											"enterprise-solutions/configuration/remote-configuration/litellm/admin-configuration",
+											"enterprise-solutions/configuration/remote-configuration/litellm/member-configuration"
+										]
+									},
+									{
+										"group": "Google Vertex AI",
+										"pages": [
+											"enterprise-solutions/configuration/remote-configuration/google-vertex/admin-configuration",
+											"enterprise-solutions/configuration/remote-configuration/google-vertex/member-configuration"
+										]
+									}
+								]
+							},
+							{
+								"group": "Organization Settings",
+								"pages": [
+									"enterprise-solutions/configuration/infrastructure-configuration/control-other-cline-features/yolo-mode",
+									"enterprise-solutions/configuration/infrastructure-configuration/control-other-cline-features/mcp-marketplace"
+								]
+							},
+							{
+								"group": "Monitoring",
+								"pages": [
+									"enterprise-solutions/monitoring/overview",
+									"enterprise-solutions/monitoring/telemetry",
+									"enterprise-solutions/monitoring/opentelemetry"
+								]
+							}
+						]
+					}
+				]
+			},
+			{
+				"tab": "Learn",
+				"icon": "graduation-cap",
+				"href": "https://cline.bot/learn"
+			}
+		]
+	},
+	"footer": {
+		"socials": {
+			"github": "https://github.com/CardSorting/LUMI"
+		}
+	},
+	"anchors": [
+		{
+			"name": "Overview",
+			"icon": "house",
+			"url": "getting-started/what-is-dietcode"
+		}
+	],
+	"redirects": [
+		{
+			"source": "/getting-started/installing-dietcode-jetbrains",
+			"destination": "/getting-started/installing-dietcode"
+		},
+		{
+			"source": "/papers",
+			"destination": "/papers/companion-brief"
+		},
+		{
+			"source": "/getting-started/overview",
+			"destination": "/getting-started/what-is-dietcode"
+		},
+		{
+			"source": "/introduction",
+			"destination": "/getting-started/what-is-dietcode"
+		},
+		{
+			"source": "/introduction/welcome",
+			"destination": "/getting-started/what-is-dietcode"
+		},
+		{
+			"source": "/introduction/overview",
+			"destination": "/getting-started/what-is-dietcode"
+		},
+		{
+			"source": "/getting-started/model-selection-guide",
+			"destination": "/core-features/model-selection-guide"
+		},
+		{
+			"source": "/provider-config/ollama",
+			"destination": "/running-models-locally/ollama"
+		},
+		{
+			"source": "/running-models-locally/read-me-first",
+			"destination": "/running-models-locally/overview"
+		},
+		{
+			"source": "/getting-started/understanding-context-management",
+			"destination": "/model-config/context-windows"
+		},
+		{
+			"source": "/best-practices/understanding-context-management",
+			"destination": "/model-config/context-windows"
+		},
+		{
+			"source": "/prompting/understanding-context-management",
+			"destination": "/model-config/context-windows"
+		},
+		{
+			"source": "/prompting/prompt-engineering-guide",
+			"destination": "/customization/cline-rules"
+		},
+		{
+			"source": "/prompting/dietcode-memory-bank",
+			"destination": "/features/memory-bank"
+		},
+		{
+			"source": "/customization/memory-bank",
+			"destination": "/features/memory-bank"
+		},
+		{
+			"source": "/customization/focus-chain",
+			"destination": "/features/focus-chain"
+		},
+		{
+			"source": "/customization/auto-approve",
+			"destination": "/features/auto-approve"
+		},
+		{
+			"source": "/customization/auto-compact",
+			"destination": "/features/auto-compact"
+		},
+		{
+			"source": "/getting-started/your-first-task",
+			"destination": "/getting-started/your-first-project"
+		},
+		{
+			"source": "/features/hooks/real-world-examples",
+			"destination": "/customization/hooks"
+		},
+		{
+			"source": "/features/hooks/index",
+			"destination": "/customization/hooks"
+		},
+		{
+			"source": "/features/hooks/hook-reference",
+			"destination": "/customization/hooks"
+		},
+		{
+			"source": "/features/hooks/samples",
+			"destination": "/customization/hooks"
+		},
+		{
+			"source": "/features/plan-and-act",
+			"destination": "/core-workflows/plan-and-act"
+		},
+		{
+			"source": "/features/checkpoints",
+			"destination": "/core-workflows/checkpoints"
+		},
+		{
+			"source": "/features/tasks/understanding-tasks",
+			"destination": "/core-workflows/task-management"
+		},
+		{
+			"source": "/features/tasks/task-management",
+			"destination": "/core-workflows/task-management"
+		},
+		{
+			"source": "/features/at-mentions/overview",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/at-mentions/file-mentions",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/at-mentions/folder-mentions",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/at-mentions/terminal-mentions",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/at-mentions/problem-mentions",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/at-mentions/git-mentions",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/at-mentions/url-mentions",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/drag-and-drop",
+			"destination": "/core-workflows/working-with-files"
+		},
+		{
+			"source": "/features/yolo-mode",
+			"destination": "/features/auto-approve"
+		},
+		{
+			"source": "/features/dietcode-rules",
+			"destination": "/customization/dietcode-rules"
+		},
+		{
+			"source": "/features/dietcode-rules/overview",
+			"destination": "/customization/dietcode-rules"
+		},
+		{
+			"source": "/features/dietcode-rules/conditional-rules",
+			"destination": "/customization/dietcode-rules"
+		},
+		{
+			"source": "/features/commands-and-shortcuts/overview",
+			"destination": "/core-workflows/using-commands"
+		},
+		{
+			"source": "/features/commands-and-shortcuts/code-commands",
+			"destination": "/core-workflows/using-commands"
+		},
+		{
+			"source": "/features/commands-and-shortcuts/terminal-integration",
+			"destination": "/core-workflows/using-commands"
+		},
+		{
+			"source": "/features/commands-and-shortcuts/git-integration",
+			"destination": "/core-workflows/using-commands"
+		},
+		{
+			"source": "/features/commands-and-shortcuts/keyboard-shortcuts",
+			"destination": "/core-workflows/using-commands"
+		},
+		{
+			"source": "/features/slash-commands/new-task",
+			"destination": "/core-workflows/using-commands"
+		},
+		{
+			"source": "/features/slash-commands/workflows/index",
+			"destination": "/customization/workflows"
+		},
+		{
+			"source": "/features/slash-commands/workflows/quickstart",
+			"destination": "/customization/workflows"
+		},
+		{
+			"source": "/features/slash-commands/workflows/best-practices",
+			"destination": "/customization/workflows"
+		},
+		{
+			"source": "/exploring-dietcodes-tools/dietcode-tools-guide",
+			"destination": "/tools-reference/all-dietcode-tools"
+		},
+		{
+			"source": "/exploring-dietcodes-tools/new-task-tool",
+			"destination": "/tools-reference/all-dietcode-tools"
+		},
+		{
+			"source": "/exploring-dietcodes-tools/remote-browser-support",
+			"destination": "/tools-reference/browser-automation"
+		},
+		{
+			"source": "/mcp/adding-mcp-servers-from-github",
+			"destination": "/mcp/adding-and-configuring-servers"
+		},
+		{
+			"source": "/mcp/configuring-mcp-servers",
+			"destination": "/mcp/adding-and-configuring-servers"
+		},
+		{
+			"source": "/more-info/telemetry",
+			"destination": "/enterprise-solutions/monitoring/telemetry"
+		},
+		{
+			"source": "/enterprise-solutions/configure-AWS-Bedrock-Admin",
+			"destination": "/enterprise-solutions/configuration/remote-configuration/aws-bedrock/admin-configuration"
+		},
+		{
+			"source": "/enterprise-solutions/configure-AWS-Bedrock-Member",
+			"destination": "/enterprise-solutions/configuration/remote-configuration/aws-bedrock/member-configuration"
+		},
+		{
+			"source": "/enterprise-solutions/configure-workOS-authkit",
+			"destination": "/enterprise-solutions/onboarding"
+		},
+		{
+			"source": "/enterprise-solutions/Onboarding your Organization",
+			"destination": "/enterprise-solutions/onboarding"
+		},
+		{
+			"source": "/enterprise-solutions/team-management/overview",
+			"destination": "/enterprise-solutions/team-management/managing-members"
+		},
+		{
+			"source": "/enterprise-solutions/team-management/roles-and-permissions",
+			"destination": "/enterprise-solutions/team-management/managing-members"
+		},
+		{
+			"source": "/features/customization/opening-dietcode-in-sidebar",
+			"destination": "/getting-started/installing-dietcode"
+		},
+		{
+			"source": "/prompting/prompt-engineering-guide/dietcodeignore-file-guide",
+			"destination": "/customization/dietcodeignore"
+		},
+		{
+			"source": "/getting-started/selecting-your-model",
+			"destination": "/getting-started/authorizing-with-dietcode"
+		},
+		{
+			"source": "/model-config/model-comparison",
+			"destination": "/core-features/model-selection-guide"
+		},
+		{
+			"source": "/troubleshooting/terminal-integration-guide",
+			"destination": "/troubleshooting/terminal-quick-fixes"
+		},
+		{
+			"source": "/features/slash-commands/deep-planning",
+			"destination": "/features/deep-planning"
+		},
+		{
+			"source": "/features/slash-commands/smol",
+			"destination": "/core-workflows/using-commands#smol"
+		},
+		{
+			"source": "/features/slash-commands/explain-changes",
+			"destination": "/core-workflows/using-commands#explain-changes"
+		},
+		{
+			"source": "/features/slash-commands/new-rule",
+			"destination": "/core-workflows/using-commands#newrule"
+		},
+		{
+			"source": "/features/skills",
+			"destination": "/customization/skills"
+		}
+	],
+	"search": {
+		"prompt": "Search LUMI documentation..."
+	}
+}

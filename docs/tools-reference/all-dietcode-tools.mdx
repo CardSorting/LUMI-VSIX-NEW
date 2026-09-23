@@ -1,0 +1,136 @@
+---
+title: "All LUMI Tools"
+sidebarTitle: "All Tools"
+description: "Complete reference for LUMI built-in agent tools (from src/shared/tools.ts)."
+---
+
+LUMI agents call tools defined in `DietCodeDefaultTool` (`src/shared/tools.ts`) and executed by handlers in `src/core/task/tools/handlers/`. Tool names below are the exact strings the model uses.
+
+## File operations
+
+| Tool | Description |
+|------|-------------|
+| `read_file` | Read file contents (with line ranges) |
+| `write_to_file` | Create or overwrite a file |
+| `replace_in_file` | Targeted search/replace edits |
+| `search_files` | Regex search across files |
+| `list_files` | List directory contents |
+| `list_code_definition_names` | List definitions (tree-sitter) |
+| `apply_patch` | Apply structured patch format |
+| `rename_files` | Reserved (handler not wired) |
+| `move_files` | Reserved (handler not wired) |
+| `delete_file` | Reserved (handler not wired) |
+
+Read-only for checkpoint purposes: `read_file`, `list_files`, `search_files`, `list_code_definition_names`.
+
+## Terminal
+
+| Tool | Description |
+|------|-------------|
+| `execute_command` | Run a shell command; output streamed to chat |
+
+## Browser & web
+
+| Tool | Description |
+|------|-------------|
+| `browser_action` | Puppeteer browser automation |
+| `web_fetch` | Fetch URL content |
+| `web_search` | Web search |
+
+See [Browser automation](/tools-reference/browser-automation).
+
+## MCP
+
+| Tool | Description |
+|------|-------------|
+| `use_mcp_tool` | Invoke a tool on a connected MCP server |
+| `access_mcp_resource` | Read an MCP resource |
+| `load_mcp_documentation` | Load MCP setup documentation |
+
+## Interaction & task control
+
+| Tool | Description |
+|------|-------------|
+| `ask_followup_question` | Ask the user a clarifying question |
+| `attempt_completion` | Signal task completion (runs completion gates) |
+| `plan_mode_respond` | Respond in Plan mode (no mutating tools) |
+| `act_mode_respond` | Respond in Act mode |
+| `new_task` | Start a follow-up task with context |
+| `condense` | Compact conversation context |
+| `summarize_task` | Summarize current task |
+| `report_bug` | Structured bug report flow |
+| `new_rule` | Create a rule file |
+| `generate_explanation` | Generate code explanation |
+| `use_skill` | Invoke an agent skill |
+| `use_subagents` | Delegate to configured subagents |
+| `project_map` | Generate project structure map |
+| `focus_chain` | Focus-chain todo tracking (enum value `focus_chain`) |
+
+## Cognitive memory (BroccoliDB)
+
+| Tool | Description |
+|------|-------------|
+| `query_cognitive_memory` | Query memory graph |
+| `create_cognitive_snapshot` | Snapshot graph state |
+| `mem_link` | Link memory nodes |
+| `mem_merge` | Merge memory entries |
+| `mem_refresh` | Refresh graph from workspace |
+| `mem_context` | Fetch contextual memory bundle |
+| `mem_blast` | Blast-radius analysis |
+| `mem_choke` | Choke-point analysis |
+| `mem_heal` | Heal graph inconsistencies |
+| `mem_forecast` | Forecast impact |
+| `mem_centrality` | Centrality metrics |
+| `mem_subgraph` | Extract subgraph |
+| `mem_append_shared` | Append shared memory layer |
+| `mem_get_shared` | Read shared memory |
+| `mem_bundle` | Bundle memory for export |
+| `mem_blame` | Attribution / blame view |
+| `mem_changelog` | Memory changelog |
+| `mem_claim` | Swarm claim (V8) |
+| `mem_release` | Swarm release (V8) |
+| `mem_hubs` | Hub nodes (V8) |
+
+## Stability & structure
+
+| Tool | Description |
+|------|-------------|
+| `diagnose_stability` | Run stability doctor |
+| `scaffold_module` | Scaffold a module |
+| `query_stability` | Query stability state |
+| `decompose_module` | Decompose a module |
+| `generate_dependency_map` | Dependency map |
+| `recalibrate_stability` | Recalibrate stability baseline |
+| `stability_integrity_sweep` | Integrity sweep |
+| `ast_repair` | AST repair suggestions |
+
+## Roadmap
+
+| Tool | Description |
+|------|-------------|
+| `roadmap` | Read/update `ROADMAP.md` steering (diagnostics: `cockpit`, `doctor`, `explain_gate`) |
+| `roadmap_checkpoint` | Roadmap validation checkpoint |
+
+Governance remediation (bootstrap autofill, schema validation, checkpoint date stamp) runs **automatically at `attempt_completion`** — agents do not need `roadmap(action='validate')` before completing. See [Roadmap steering](/features/roadmap-steering).
+
+Controlled by VS Code settings `lumi.roadmap.*` in `package.json`.
+
+## Runtime kernel
+
+| Tool | Description |
+|------|-------------|
+| `dietcode_kernel` | BroccoliDB kernel bridge for advanced runtime ops |
+
+## Dynamic subagent tools
+
+`ToolExecutorCoordinator` also registers **dynamic subagent handlers** loaded from agent config (`src/core/task/tools/subagent/`). Names are not in the static enum.
+
+## Approval behavior
+
+Mutating tools require user approval unless [auto-approve](/features/auto-approve) rules match. Read-only tools are listed in `READ_ONLY_TOOLS` in `src/shared/tools.ts`.
+
+## Source
+
+- Enum: `src/shared/tools.ts`
+- Coordinator: `src/core/task/tools/ToolExecutorCoordinator.ts`
+- Handlers: `src/core/task/tools/handlers/`

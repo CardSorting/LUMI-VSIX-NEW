@@ -1,0 +1,482 @@
+# Governed Execution Operator Runbook
+
+SRE-style playbook for governed swarm receipts: triage incidents, interpret violations, recover safely, and decide when retry is allowed.
+
+| Doc | Purpose |
+|-----|---------|
+| [governed-roadmap-projection-quickref.md](governed-roadmap-projection-quickref.md) | One-page patch tags, rejection reasons, operator legend |
+| [governed-subagent-execution.md](governed-subagent-execution.md) | Architecture and patterns |
+| [governed-execution-schema.md](governed-execution-schema.md) | Receipt field reference |
+| [governed-execution-decisions.md](governed-execution-decisions.md) | Why the system works this way |
+
+---
+
+## On-call quick reference
+
+**North-star:** Locks protect mutation. Receipts preserve forensic truth. The coordinator owns live authority — [governed execution authority](governed-execution-authority.md).
+
+**Roadmap:** Private projection state is cheap. Workspace roadmap truth is expensive. Only the coordinator may spend it.
+
+| Question | Answer |
+|----------|--------|
+| Where is truth? | Last `sealed && mergePassed` in `{swarmId}.governed.history.jsonl`, or `loadAuthoritativeGovernedReceipt()` |
+| Is "lock skipped" a bug? | **No** — expected for read/audit/plan/doc/diagnostic lanes |
+| Is missing `claimId` a bug? | Only if `executionMode: mutation` or lane performed writes |
+| Can two lanes read the same file? | **Yes** — read overlap is not a violation |
+| Can lanes mutate workspace roadmap directly? | **No** — use `propose_patch`; coordinator commits after reconciliation |
+| What changes workspace roadmap? | `commitWorkspaceRoadmapPatches` under `roadmap:workspace` lock after seal |
+| When is retry safe? | `diagnostics.retrySafe === true` in incident console |
+| What blocks merge? | `mergeGate.violations` only; `advisoryWarnings` never block — see [violation catalog](#violation-catalog) |
+| Should I retry the swarm? | Follow `retryDisposition`; never infer retry scope from warning text |
+| What if SQLite is down? | Treat as `DATABASE_AUTHORITY_UNAVAILABLE`; retry at a safe boundary or fail closed |
+| Can I delete a stale-looking lock file? | No. Reconcile against SQLite, or use the isolated administrative cleaner with an override reason |
+
+---
+
+## Authoritative state procedure
+
+Chat status and latest pointer can lie after a failed retry. Use this procedure:
+
+1. Open `{taskDir}/subagent_executions/{swarmId}.governed.history.jsonl`
+2. Scan **from bottom** for first entry with `sealed: true` and `mergePassed: true`
+3. Load `{swarmId}.governed.{attemptId}.json` for that `attemptId`
+4. Or call `loadAuthoritativeGovernedReceipt(taskId, swarmId)`
+
+**Latest pointer rule:** `{swarmId}.governed.json` is **not updated** when a new attempt fails seal but a prior attempt sealed successfully.
+
+---
+
+## Incident taxonomy
+
+Derived by `deriveReceiptIncident()` (priority order). Use **Symptom → Diagnosis → Action**.
+
+| Incident | Symptoms | Diagnosis | Action |
+|----------|----------|-----------|--------|
+| **sealed_success** | Green seal, merge ok | Gate passed, replay valid | Treat swarm as complete |
+| **in_progress** | Lanes running, live summary | Execution not sealed | Wait; do not merge or retry over |
+| **partial_receipt** | Unsealed, lanes `running`, `retryReason` crash prefix | Interrupt before seal | Inspect claim timeline; recover stale mutation claims; retry with `parentAttemptId` |
+| **stale_claim** | Stale count > 0, `stale_detected` in history | Expired lease / stale file or fence | Run [stale recovery](#stale-recovery-procedure) |
+| **unsafe_retry** | Supersession violation | Retry would overwrite sealed success | Link via `parentAttemptId`; do not delete sealed attempt |
+| **merge_blocked** | Violations list non-empty | Reconciliation failed | [Violation catalog](#violation-catalog) → fix → retry |
+| **replay_mismatch** | Checksum / integrity invalid | Receipt or envelope drift | Forensic compare; re-run from authoritative attempt |
+| **corrupted_receipt** | Schema validation failed | Malformed JSON or wrong version | Inspect file on disk; do not merge |
+| **backend_unavailable** | Durable layer missing | DB/workspace unavailable | Fix workspace/DB; re-admit |
+| **failed_receipt** | Sealed false, no other class | General failure | Full receipt review |
+
+### Incident console UI map
+
+| UI section | Source field |
+|------------|--------------|
+| Incident badge | `diagnostics.incident` |
+| Summary line | `diagnostics.incidentSummary` |
+| Retry safe / unsafe | `diagnostics.retrySafe`, `retryUnsafeReason` |
+| Lane receipts | `laneStates[]` — mode, lock skipped/required, read/write counts |
+| Lane DAG | `laneDag[]` |
+| Resource ownership | `resourceOwners[]` — mutation claims only |
+| Claim timeline | `claimTimeline[]` — no lock-skipped lanes |
+| File overlaps | `diagnostics.overlappingPaths` — **write collisions only** |
+| Roadmap overlaps | `diagnostics.overlappingRoadmapResources` — legacy direct-write audit |
+| Roadmap planes | `roadmapLinkage.patchReconciliation`, `workspaceRoadmapSnapshotId` |
+| Accepted / rejected patches | `roadmapLinkage.patchReconciliation.acceptedPatches` / `rejectedPatches` |
+| Rebase outcomes | `diagnostics.rebaseResults` or `patchReconciliation.rebaseResults` |
+| Rejected patch reasons | `diagnostics.rejectedPatchReasons` |
+| Workspace commit status | `diagnostics.roadmapCommitStatus` |
+| Stale projections | `diagnostics.staleProjectionWarnings` |
+| Merge violations | `violations[]` |
+| Audit advisories | `advisoryWarnings[]` — visible, no retry required |
+| Retry action | `retryDisposition` — explicit coordinator guidance |
+
+---
+
+## Lock necessity (operator)
+
+### Console signals
+
+| Signal | Meaning |
+|--------|---------|
+| Mode badge (`read_only`, …) | Declared execution mode |
+| **lock skipped** (green) | No governed ownership; safe read/audit lane |
+| **lock required** (blue) | Mutation or escalated lane |
+| `read:N` | Read set size |
+| `write:N` | Write set size — attention if lock skipped |
+| No claim ID | Expected when lock skipped |
+
+**Do not escalate** lock-skipped lanes as "missing lock."
+
+### Lock decision matrix
+
+| Condition | Lock |
+|-----------|------|
+| `mutation` (default) | Required |
+| `[write_set:…]` | Required (escalated) |
+| `[declares_writes]`, `[mutates_roadmap]`, `[mutates_broccoli]` | Required |
+| `[updates_authoritative_receipt]`, `[exclusive_resource:…]` | Required |
+| Read/audit/plan/doc/diagnostic, no escalation | **Skipped** |
+
+### Parallel safety matrix
+
+| Scenario | Merge collision? |
+|----------|------------------|
+| Two `read_only` lanes read `src/a.ts` | No |
+| Two `audit_only` lanes inspect same receipt | No |
+| Two `planning_only` lanes reference same roadmap item | No |
+| `diagnostic_only` append-only evidence | No |
+| Two `mutation` lanes write `src/a.ts` in parallel | **Yes** — `unsafe mutation overlap` |
+| Non-mutating lane ran write tools without lock | **Yes** — `performed writes without lock` |
+| Dependent lane writes after predecessor (DAG order) | No — allowed when deps wired |
+
+---
+
+## Roadmap projection (operator)
+
+### Three planes at a glance
+
+| Plane | Operator signal | Safe to ignore? |
+|-------|-----------------|-----------------|
+| Agent | `agentRoadmapId`, `local:N`, `patches:N` on lane row | Yes — private state |
+| Swarm | `swarm plan: N lanes` | Yes — linkage only |
+| Workspace | `workspace snap`, `commit:`, accepted/rejected counts | **No** — authoritative |
+
+### Reading the Roadmap planes section
+
+| UI line | Meaning | Action if wrong |
+|---------|---------|-----------------|
+| `workspace snap: rm-snap-…` | Current workspace snapshot at seal | Compare to lane `roadmapSnapshotId` |
+| `accepted patches: N` | Patches passed reconciliation | Expect > 0 for roadmap updates |
+| `rejected patches: N` | Failed quality/rebase/conflict | Read rejection reasons |
+| `rebase {id}: rebased` | Patch safely rebased to current snapshot | Normal when workspace moved during run |
+| `rebase {id}: stale_conflict` | Stale patch cannot apply | Retry lane with fresh projection |
+| `Rejected patch reasons` | Why each patch failed | Fix evidence, rationale, or target item |
+| `commit: blocked` | Workspace not updated | See `workspaceCommit.blockReason` on receipt |
+| `commit: committed` | Coordinator applied patches | Verify kanban state |
+| `commit: skipped` | Roadmap disabled or no actionable patches | Expected for file-only swarms |
+| `stale projections: …` | Projection out of sync | Re-run affected lanes |
+
+### Per-lane projection signals
+
+| Signal | Meaning |
+|--------|---------|
+| `patches:N` | Lane proposed N workspace patches |
+| `local:N` | Lane recorded N private local events |
+| Truncated `agent-rm:…` | Projection ID (hover for full) |
+| `directWorkspaceRoadmapMutation` on receipt | **P1** — agent bypassed patch model |
+
+### Patch rejection reasons (common)
+
+| Reason pattern | Cause | Fix |
+|----------------|-------|-----|
+| `missing evidence pointer` | `mark_complete` without `evidence=` | Add `[propose_patch:…:evidence=path]` |
+| `vague or missing rationale` | Rationale too short or generic | Use specific rationale ≥ 8 chars |
+| `insufficient confidence` | `confidence` < 0.5 | Set `confidence=0.8` or higher |
+| `stale conflicting patch` | `mark_complete` on old snapshot | Re-acquire lane or use `attach_evidence` first |
+| `failed lane cannot mark roadmap complete` | Failed lane proposed completion | Fix lane or use advisory patch |
+| `conflicting workspace patches` | Two lanes incompatible on same item | Add DAG dependency or split items |
+| `smuggled authoritative mutation via local event` | Mutation language in local event | Use `propose_patch` instead |
+
+### Coordinator commit blocked
+
+Check receipt `roadmapLinkage.workspaceCommit.blockReason`:
+
+| blockReason | Meaning |
+|-------------|---------|
+| `merge gate did not pass` | Fix merge violations first |
+| `roadmap patch reconciliation failed` | Fix rejected patches |
+| `receipt not sealed` | Partial/crash receipt |
+| `receipt integrity invalid` | Replay mismatch |
+| `no actionable patches to commit` | Only advisory patches or none proposed |
+| `completion policy advisory_only blocks mark_complete commit` | Enable policy or use advisory |
+| `coordinator failed to acquire roadmap:workspace lock` | Stale lock — recover `roadmap:workspace` |
+| `roadmap disabled` | `commitStatus: skipped` — expected |
+
+**No lane-level workspace commit path exists.** If workspace roadmap changed without `workspaceCommit.committed: true`, investigate out-of-band writes.
+
+---
+
+## Retry decision flow
+
+### Retry dispositions
+
+| Value | Operator action |
+|-------|-----------------|
+| `not_needed` | Accept the seal. Advisory enrichment may happen later; do not rerun completed work. |
+| `targeted_repair` | Repair/resume only affected lanes and dependent descendants. Preserve successful lane artifacts. |
+| `retry_after_recovery` | Reconcile claims, leases, or coordinator state first; then retry only incomplete work. |
+| `do_not_retry` | Use authoritative sealed state or create an explicitly linked child attempt. |
+
+### Parent continuation
+
+`continuationDecision` is the sole final parent action. Downstream presentation may render advisories but must not reinterpret findings or retry dispositions. A clean accepted receipt uses `accept`; a safe receipt with warnings uses `accept_with_advisories`; localized defects use `targeted_repair`; coordination interruption uses `recover_and_resume`; hard ownership conflicts use `halt_for_conflict`; corrupt immutable results use `reject_invalid_result`.
+
+### Live parent-flow policy
+
+| Control | Runtime behavior | Operator implication |
+|---------|------------------|----------------------|
+| Concurrency | At most 3 active model requests through a priority-aware bulkhead pool (FIFO within equal priority; 1 slot reserved for fast I/O when waiting) | Capacity is bounded; non-mutating lanes cannot be starved by mutation lanes; backoff releases slots |
+| Approval | Read permission and read/diagnostic tools for non-mutating lanes; edit permission or one approval for mutation | Inner lane I/O does not prompt repeatedly after authority is granted |
+| DAG priority | Weighted longest ready downstream path (read-only/diagnostic boost) | Lanes that unblock more work and fast I/O authority lanes may start before lower-index lanes |
+| Status persistence | Latest state coalesced to 250 ms; partial running progress is UI-only | Disk writes at terminal staging/seal only; parent stops progress I/O before sealing |
+| Artifact writes | Invocation-ordered per swarm, atomic temp-file replacement, unsealed staging marker | Different swarms persist concurrently; readers never see torn JSON or resume pre-seal state |
+| Control-plane I/O | Progress/UI best-effort with 2 s UI bounds; preflight overlaps execution with a 10 s bound; child-stream registration gates no lane | Required joins occur at the terminal seal barrier, not worker startup |
+| Attempt timeout | 5 minutes, bounded by the 20-minute swarm deadline | A lane cannot extend the parent deadline through retries |
+| Retry | Transient failures only, 3 total attempts, capped full jitter; locks released during backoff | Auth, budget, iteration, cancellation, and deterministic task failures do not retry |
+| Lane pipeline | Slot → claim → run; active executions capped (capacity + 1); scheduler wakes on slot release | Retry backoff frees slots and active execution capacity for other lanes |
+| Attempt isolation | Fresh runner/model client; 2-second abort grace before replacement | No overlapping replacement if the prior attempt cannot quiesce |
+| Parent budget | Tokens/cost accumulated across attempts | Retry spend is visible and an aggregate cost crossing fails the crossing lane |
+| Fast I/O throughput | Non-mutating lanes may parallelize independent tool calls when parent setting allows | Read/diagnostic lanes batch reads while every call retains one [central execution funnel](parent-thread-execution-authority.md) event |
+| Dependency failure | Propagated immediately to downstream pending lanes | Independent lanes continue; blocked descendants fail with upstream IDs |
+
+Worker lanes cannot spawn verifier lanes. A worker emits `SIGNAL: REVIEW_REQUESTED`; the parent schedules review if needed. Shared `.wiki/` writes belong to an explicitly assigned documentation lane or parent finalization.
+
+```mermaid
+flowchart TD
+	A[Read retryDisposition] --> B{Disposition}
+	B -->|not_needed| C[Accept seal; no retry]
+	B -->|targeted_repair| D[Resume affected lanes and descendants]
+	B -->|retry_after_recovery| E[Recover ownership or coordinator state]
+	E --> F{diagnostics.retrySafe?}
+	F -->|yes| D
+	F -->|no| E
+	B -->|do_not_retry| G[Use authoritative result or linked child attempt]
+```
+
+### isRetrySafe() conditions
+
+**Unsafe when:**
+
+- Any `resourceOwners` with `status: active`
+- Any `status: stale` (must recover first)
+- `mergeGate.sealedSupersessionBlocked`
+- Prior sealed attempt exists and current DAG has `running` nodes
+
+**Safe when:** none of the above.
+
+Lock-skipped lanes from prior attempt impose **no** claim cleanup.
+
+---
+
+## Violation catalog
+
+Exact strings from `MergeGate.runMergeGate()`. Use for log search and alert routing.
+
+### Mutation safety
+
+| Violation pattern | Meaning | Remediation |
+|-------------------|---------|-------------|
+| `unsafe mutation overlap on '{path}': {agents}` | Parallel writes to same path | Serialize lanes, add DAG dep, or split write sets |
+| `mutation lane {laneId} missing governed lock` | Mutation mode without claim | Bug or bypassed acquire — inspect handler |
+| `mutation lane {laneId} performed writes without lock` | Write tools ran without claim | Ensure mutation acquire succeeded |
+| `non-mutating lane {laneId} ({mode}) performed writes without lock` | Mode/write mismatch | Add `[write_set:…]` and accept lock, or fix lane tools |
+
+### Audit advisories (non-blocking)
+
+| Advisory pattern | Follow-up |
+|------------------|-----------|
+| `missing evidence: {agentIds}` | Ensure agents record `evidenceRefs` |
+| `missing transcript pointer: {laneIds}` | Completed lanes need `transcriptArtifactPath` |
+| `missing tool evidence: {laneIds}` | Completed lanes need tool steps or evidence |
+| `unresolved placeholders: {agentIds}` | Remove TODO/FIXME/PLACEHOLDER/TBD from output |
+
+These signals remain audit-visible but do not fail a safe merge. Enrich evidence or repair transcript persistence asynchronously; do not rerun the whole swarm solely for these findings.
+
+### Status integrity
+
+| Violation pattern | Remediation |
+|-------------------|-------------|
+| `lane {laneId} marked completed but agent status is failed` | Reconcile lane vs envelope status |
+| `failed lane marked successful in envelope: {laneId}` | Same |
+| `failed lanes: {laneIds}` | Fix or exclude failed lanes before seal |
+| `unsealed DAG nodes: {laneIds}` | All nodes must be `sealed` or `failed` at seal |
+
+### Ownership (mutation lanes only)
+
+| Violation pattern | Remediation |
+|-------------------|-------------|
+| `orphaned claims: {count}` | Release or recover — filter `lockRequired` lanes |
+| `unreleased claims: {laneIds}` | Call release path; check crash phase |
+| `stale leases: {count}` | Unresolved stale ownership only; run stale recovery. A matching later `released` event clears the gate. |
+| `duplicate claim on '{resource}': {a}, {b}` | Split-brain acquire — recover stale |
+| `duplicate claimId '{id}' on resources '…' and '…'` | Claim ID collision — forensic claim history |
+| `split-brain lock authority detected` | Multiple owner:token per resource |
+
+### Lineage and replay
+
+| Violation pattern | Remediation |
+|-------------------|-------------|
+| `unsealed retry cannot supersede prior sealed receipt` | Set `parentAttemptId`; complete or fail all DAG nodes |
+| `replay checksum mismatch — non-deterministic state detected` | Receipt edited post-seal or envelope drift |
+| `swarm id mismatch: …` / `task id mismatch: …` | Align artifact IDs |
+| `lane count mismatch: …` | Lane receipts vs replay lineage |
+| Replay schema violations | `unsupported replay schema`, `missing artifact id`, etc. |
+
+### Roadmap projection
+
+| Violation pattern | Remediation |
+|-------------------|-------------|
+| `agent {id} cannot directly mutate workspace roadmap — emit proposedWorkspacePatch` | Use `[propose_patch:…]`; never write workspace kanban from lane |
+| `agent {id} smuggled authoritative mutation via local event: …` | Move intent to `propose_patch` or remove mutation phrasing from local events |
+| `conflicting workspace patches on '{itemId}': {a}, {b}` | Serialize via DAG dependency or split target items |
+| `unsafe roadmap mutation overlap` | Legacy direct-write audit — use projection model |
+| `roadmap mutation without claim` | Legacy audit — use patch proposals |
+| `lock-skipped lane … mutated roadmap` | Fix execution mode or route through patches |
+
+Patch rejections are recorded in `roadmapLinkage.patchReconciliation.rejectedPatches` and surfaced as `diagnostics.rejectedPatchReasons`. Combined with direct-mutation flags, they block seal.
+
+---
+
+## Stale recovery procedure
+
+Applies to **mutation lanes** with durable locks. Lock-skipped lanes: skip.
+
+1. **Incident console** — note stale claims, ownership conflicts, projection corruption, and database health.
+2. **Require SQLite availability** — reconciliation must read the authoritative lease. If unavailable, stop; do not inspect file age and infer ownership.
+3. **Capture one reconciliation snapshot** — SQLite lease plus memory, file, and Broccoli projections.
+4. **Validate every identity** — `ownerId`, `leaseEpoch`, `fencingToken`, and `authorityMode` must agree. A projection with a newer token, incompatible mode, malformed JSON, or `expiresAt < claimedAt` fails closed.
+5. **Apply the database decision first:**
+   - live SQLite lease: retain it and repair missing/stale projections;
+   - expired SQLite lease: delete it by the full identity tuple, then clean matching projections;
+   - no SQLite lease: remove only projections whose absence was confirmed against that snapshot.
+6. **Confirm** the claim timeline reports `released`, `recovered`, or a projection repair and re-check `isRetrySafe`.
+
+The file fallback predicate is used only when a structurally valid record has no `expiresAt`: `heartbeatAt ?? claimedAt` plus the configured stale duration. A future `expiresAt` always wins over file age. Normal runtime never unlinks malformed records automatically.
+
+### Administrative cleanup
+
+`src/core/governance/AdministrativeLockCleaner.ts` is the only ownership-override path. It is intentionally absent from `LockAuthority` and normal swarm flow.
+
+Use it only after preserving evidence and establishing that ordinary database-backed reconciliation cannot complete the operational recovery. The caller must provide a non-empty override reason. The cleaner logs each SQLite, memory, file, and Broccoli record it unlinks. Never replace this procedure with direct `rm` of lock files.
+
+### Database authority outage
+
+| Symptom | Required response |
+|---------|-------------------|
+| Connection/open/query failure | Surface `DATABASE_AUTHORITY_UNAVAILABLE` (`retry`) |
+| Reconciliation snapshot cannot read SQLite | Return no reclamation actions |
+| Existing file/memory projection appears free | Ignore it as authority; do not acquire locally |
+| Retry budget exhausted | Fail closed and preserve all records for later reconciliation |
+
+---
+
+## Claim timeline
+
+| Event | Meaning |
+|-------|---------|
+| `admitted` | Roadmap allowed swarm |
+| `acquired` | Mutation claim succeeded |
+| `released` | Claim cleared via `UnifiedLockAuthority` |
+| `rejected` | Acquire failed — check backend tags |
+| `stale_detected` | Stale owner — recover before retry |
+| `recovered` | Stale lock reclaimed |
+
+**Lock-skipped lanes never appear** in acquired/released — they never held ownership.
+
+### Backend tags (resource ownership row)
+
+| Tag | Layer |
+|-----|-------|
+| `proc` | In-process |
+| `db` | SwarmMutex |
+| `lease` | Roadmap |
+| `file` | File lock |
+| `fence` | Broccoli fence |
+
+Partial acquire (SQLite committed, file or fence projection failed) → **rejected**; the exact SQLite lease is ownership-checked and abandoned. A changed SQLite identity is never deleted.
+
+---
+
+## Crash phases
+
+| Phase | Receipt signal | Orphan / unreleased? |
+|-------|----------------|----------------------|
+| After claim, before execution | Partial, lane `running` | Orphan if mutation |
+| During execution | Partial | — |
+| After execution, before release | Unreleased claim violation | Mutation only |
+| After release, before seal | Unsealed, may lack evidence | No |
+| Lock-skipped lane any phase | Lane receipt `lockRequired: false` | **No** |
+| Parent before merge gate | Live `in_progress` summary | — |
+| Failed retry after sealed success | Failed attempt file; pointer unchanged | Prior sealed authoritative |
+
+`SubagentToolHandler` invokes `sealCrashReceipt()` on timeout, abort, or parent interruption — crash phase inferred via `inferSwarmCrashPhase`. Authoritative sealed success is preserved by `shouldUpdateLatestPointer` in `GovernedExecutionStore`.
+
+---
+
+## Replay checksum mismatch
+
+**Hashed fields:** `swarmId`, `executionId`, `taskId`, `admission`, lane status + sorted `touchedFiles`, `mergePassed`, replay artifact ID/status.
+
+**Not hashed:** lock fields, `executionMode`, `readSet`, `writeSet`, `claimHistory`.
+
+### Common causes
+
+| Cause | Check |
+|-------|-------|
+| Receipt edited after seal | File mtime vs `sealedAt` |
+| Envelope mutated | Compare `{swarmId}.json` to seal-time copy |
+| Lane count drift | `laneReceipts.length` vs replay lineage |
+| ID drift | `taskId` / `swarmId` mismatch strings |
+
+Use `explainReplayMismatch()` output in incident console.
+
+---
+
+## Harness author checklist
+
+1. **Read-only review** — `[execution_mode:read_only]` + `[read_set:…]`
+2. **Audit** — `[execution_mode:audit_only]`; no lock expected
+3. **Doc edit** — `[write_set:…]` or `mutation` mode
+4. **Default** — omit tag = mutation = lock required
+5. **Parallel reads** — safe across read_only lanes
+6. **Parallel writes** — require mutation + non-overlapping write sets or DAG order
+7. **Roadmap updates** — `[propose_patch:…]` with `evidence=`, `rationale=`, `confidence=`; no direct workspace writes
+8. **Local progress** — `[local_roadmap:progress_note:ITEM:…]` for private notes only
+9. **Mark complete** — `[propose_patch:mark_complete:ITEM:evidence=path|rationale=…|confidence=0.9]`
+
+## Forensic artifact locations
+
+```
+{taskDir}/subagent_executions/
+  {swarmId}.json                          # envelope
+  {swarmId}.governed.{attemptId}.json     # immutable receipt
+  {swarmId}.governed.history.jsonl        # attempt index
+  {swarmId}.governed.json                 # latest pointer (may lag)
+  {swarmId}/agents/{agentId}.transcript.jsonl
+
+{workspace}/.broccolidb/governed/
+  locks/{sha256(resourceKey)}.lock
+  fencing/{sha256(resourceKey)}.json
+```
+
+---
+
+## Escalation guide
+
+| Severity | Condition | Escalate to |
+|----------|-----------|-------------|
+| P3 | Single merge violation, clear fix | Harness author / retry |
+| P2 | Stale claims persist after recovery | Platform — lock backend health |
+| P2 | `DATABASE_AUTHORITY_UNAVAILABLE` persists | Platform — SQLite health; do not switch authority modes |
+| P2 | `split-brain lock authority detected` | Platform — forensic claim history |
+| P1 | Data loss suspected (authoritative receipt missing) | Stop merges; preserve `history.jsonl` |
+| P1 | Repeated fence fail-closed with DB up | BroccoliDB / workspace integrity |
+
+---
+
+## Quick diagnostic checklist
+
+1. **Lane receipts** — is `lock skipped` expected for this mode?
+2. **Overlap violation** — is it `unsafe mutation overlap` (writes), not reads?
+3. **Orphaned claims** — filter to `lockRequired: true` lanes only
+4. **Non-mutating blocked** — did lane run write tools? Fix mode or add write_set
+5. **Authoritative state** — `history.jsonl` sealed entry, not chat or latest pointer alone
+6. **Retry** — `diagnostics.retrySafe` before re-run
+7. **Roadmap projection** — check accepted vs rejected patches before assuming kanban updated
+8. **Workspace commit** — `diagnostics.roadmapCommitStatus` must be `committed` for patch-driven updates
+9. **Authority health** — SQLite snapshot available; no dynamic local fallback
+10. **Projection integrity** — exact owner/epoch/token/mode match; malformed records preserved
+
+---
+
+## Related
+
+- [Architecture](governed-subagent-execution.md)
+- [Schema](governed-execution-schema.md)
+- [Decisions](governed-execution-decisions.md)

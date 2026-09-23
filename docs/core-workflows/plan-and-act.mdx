@@ -1,0 +1,46 @@
+---
+title: "Plan & Act Mode"
+sidebarTitle: "Plan & Act"
+description: "Separate Plan and Act API configurations and response tools in LUMI."
+---
+
+LUMI uses two **modes** — `plan` and `act` — defined in `src/shared/storage/types.ts`. Each mode can use a different provider and model (`planModeApiProvider`, `actModeApiProvider` in extension state).
+
+## Tools per mode
+
+| Mode | Response tool | Typical behavior |
+|------|---------------|------------------|
+| **Plan** | `plan_mode_respond` | Exploration, architecture discussion, read-only tools |
+| **Act** | `act_mode_respond` | Implementation; mutating tools (`write_to_file`, `execute_command`, etc.) |
+
+Handlers: `PlanModeRespondHandler`, `ActModeRespondHandler` in `src/core/task/tools/handlers/`.
+
+Mode can be inferred from message history via `inferAgentModeFromMessages` (`src/shared/inferAgentModeFromMessages.ts`). `/replan` injects a replan prompt (`src/core/slash-commands/index.ts`).
+
+## Settings
+
+In **LUMI Settings → API Configuration**, use the **Plan** and **Act** tabs (`ApiConfigurationSection.tsx`) to set provider, model, and thinking budget independently.
+
+## Typical flow
+
+1. User describes a goal.
+2. Agent gathers context with read-only tools (search, read files, project map).
+3. In Plan mode, agent responds with `plan_mode_respond` — strategy without writes.
+4. User approves direction or sends follow-ups; agent transitions to Act mode.
+5. In Act mode, agent uses mutating tools; each requires approval unless auto-approve matches.
+6. Agent finishes with `attempt_completion` (subject to roadmap and audit gates when enabled).
+
+## Replanning
+
+- Slash **`/replan`** — injects replan instructions (`replanToolResponse`).
+- Natural language — "let's rethink this" during idle gaps between turns (`idleGapFeedback` utilities in task loop).
+
+## Auto-approve / YOLO
+
+`ExecutionFunnel` can record automatic approval when the operation's pure intent is eligible and current settings plus execution policy admit every declared capability. Otherwise it prompts and records the explicit decision before issuing a permit. Enterprise docs may refer to broad automation settings as "YOLO mode" — see [auto-approve](/features/auto-approve).
+
+## Related
+
+- [Model selection](/core-features/model-selection-guide)
+- [Using commands — /replan](/core-workflows/using-commands)
+- [All tools](/tools-reference/all-dietcode-tools)

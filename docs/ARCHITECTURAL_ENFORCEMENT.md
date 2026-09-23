@@ -1,0 +1,56 @@
+---
+title: "Architectural Enforcement Engine"
+sidebarTitle: "Architectural Enforcement"
+description: "The deep forensic systems that ensure code quality, layer purity, and system stability."
+---
+
+# Architectural Enforcement Engine
+
+LUMI is unique because it includes a built-in **Architectural Enforcement Engine**. This isn't just a linter; it's a real-time policy layer that monitors every thought and action the agent takes to ensure your codebase remains clean, modular, and stable.
+
+## 🛡️ The Universal Guard
+
+At the heart of LUMI is the **Universal Guard**. This system acts as a forensic monitor that sits between the AI's reasoning and your physical workspace.
+
+- **Layer Awareness**: LUMI understands the specific role of every file in your project (e.g., `DOMAIN`, `CORE`, `INFRASTRUCTURE`).
+- **Contextual Blocking**: In **Plan Mode**, the guard actively prevents the agent from making side effects in sensitive layers like `CORE` or `DOMAIN`, ensuring that the planning phase remains pure and focused on architecture.
+- **Architectural Guidance**: If the agent proposes a change that violates project layering rules (e.g., a Domain model importing from an Infrastructure adapter), the Guard intercepts the action and provides immediate "Architectural Feedback."
+
+## 🩺 Autonomous Self-Healing
+
+LUMI doesn't just write code; it maintains it. The **Refactor Healer** system runs automatically after file edits to ensure consistency:
+
+- **Tag Alignment**: Automatically synchronizes JSDoc tags, file headers, and metadata to match project standards.
+- **Import Resolution**: Ensures that new code uses the correct project-wide aliases and follows module boundary rules.
+- **Structural Cleanup**: If an edit introduces minor structural inconsistencies, the healer attempts to resolve them before presenting the final result for your approval.
+
+## 📡 Reactive Policy Observation
+
+LUMI monitors the AI's "thought stream" in real-time, even before a tool is executed:
+
+- **Smell Detection**: The **Policy Observer** scans streaming output for "architectural smells"—patterns that indicate the agent might be heading toward a poor design choice.
+- **Real-time Warnings**: It can surface warnings to both you and the AI agent during the thinking phase, allowing for immediate course correction before code is even written.
+
+## 📊 Stability Telemetry
+
+Every change is measured for its impact on project health:
+
+- **Stability Scores**: After a successful edit, LUMI calculates a stability score for the affected file based on complexity, churn, and dependency health.
+- **Violation Tracking**: The system tracks how many architectural violations were introduced or resolved during a task, providing a clear "Net Health" impact report.
+
+## ⚡ Central execution funnel
+
+Every parent, sibling, and subagent tool invocation enters `ExecutionFunnel`. The funnel owns registration, task/lane admission, plan mode, fencing, collision and roadmap checks, policy, hooks, the dispatch permit, reliability, and one terminal event. Query fast paths remain classifications inside this authority.
+
+| Tier | Parent behavior |
+|------|-----------------|
+| **Hot** | Workspace queries reuse task authority while still enforcing required parameters, `.dietcodeignore`, cancellation, and lane admission |
+| **Governed** | Mutations and side effects add plan mode, fencing, collisions, roadmap policy, guards, hooks, and consent |
+| **Terminal** | One immutable event records success, failure, denial, cancellation, or the decisive block; task completion remains a separate `CompletionFunnel` decision |
+
+When a tool is blocked, inspect the event's stable reason code and ordered stage trace; do not infer state from handler prose.
+
+Full reference: **[Central execution funnel](parent-thread-execution-authority.md)** — authority in `src/core/task/tools/execution/ExecutionFunnel.ts`, event contract in `src/shared/execution/executionFunnelEvent.ts`.
+
+---
+*LUMI isn't just an agent that codes; it's an architect that enforces. Build systems that stand the test of time.*

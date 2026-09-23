@@ -1,0 +1,65 @@
+# Workspace Knowledge Ledger
+
+This ledger now routes to the current LUMI workspace operating docs and preserves older forensic pages as historical context. Prefer the root continuity docs for current agent operation.
+
+## 🗺️ Navigation
+
+- [**Agent Playbook**](../AGENT_PLAYBOOK.md) — Current-state operating brief for future agents.
+- [**Recoverable Context Compaction**](recoverable-context-compaction.md) —
+  Why context is projected, how BroccoliDB CAS/SQLite central recovery works,
+  tier/cursor limits, silent rollover, failure semantics, and validation.
+- [**Agent Fast Orientation**](agent/playbook.md) — Current execution hot paths and validation loop.
+- [**Agent Memory**](agent/agent-memory.md) — Durable constraints and safety boundaries.
+- [**Key Findings**](agent/key-findings.md) — Evidence-backed execution and throughput findings.
+- [**Troubleshooting**](agent/troubleshooting.md) — Reproduced failures and exact recovery commands.
+- [**Common Pitfalls**](agent/common-pitfalls.md) — Workspace-specific execution traps.
+- [**Patterns**](agent/patterns.md) — Repeatable fast-path implementation patterns.
+- [**Workspace Wiki**](../WIKI.md) — Stable architecture, subsystem map, setup, testing, deployment notes.
+- [**Troubleshooting**](../TROUBLESHOOTING.md) — Reproduced failures, fixes, confirmed non-causes, validation guidance.
+- [**Decisions**](../DECISIONS.md) — Root-level continuity ADRs and operating decisions.
+- [**Handoff**](../HANDOFF.md) — Current working-tree transfer notes.
+- [**01 System Overview**](01-system-overview.md) — Current `.wiki` overview aligned to LUMI + BroccoliDB.
+- [**Active Technical Changelog**](changelog.md) — Ledger change record.
+- [**MEOW Executive Brief**](meow-executive-brief.md) — Maintainer and onboarding summary.
+- [**MEOW Philosophy**](meow-philosophy.md) — Normative reasoning and operating principles.
+- [**MEOW Technical Whitepaper**](meow-whitepaper.md) — Canonical technical architecture reference.
+- [**MEOW Architecture Decision Records (ADRs)**](adr/README.md) — Decision records for the execution model.
+- [**MEOW-011: Approval Is Execution Admission**](adr/MEOW-011-execution-approval-admission.md) — Central approval, causal permit, and handler-intent contract.
+- [**MEOW-012: Transactional Task Lifecycle Authority**](adr/MEOW-012-transactional-task-lifecycle.md) — Generation-bound state transitions, cancellation, resume, parent/child propagation, and immutable events.
+- [**MEOW-013: Recoverable Turn-Boundary Context Projection**](adr/MEOW-013-recoverable-context-projection.md) — Durable-source, bounded, stream-safe context projection.
+- [**MEOW-014: Universal Zenith Resilience Engineering & Epistemic Graph Infrastructure**](adr/MEOW-014-universal-zenith-resilience.md) — Circuit breakers, speculative read caching, adaptive lock backoff jitter, Epistemic PageRank confidence scoring, 4-pillar forensic diagnostic probes, and Task DAG dependency scheduling.
+- [**MEOW-017: Guided Spec Execution Mode (v1.0.0-spec) & Zero-Syntax Shielding**](adr/MEOW-017-guided-spec-execution-mode.md) — Zero-syntax product management wrapper, 4-phase state machine, real-time parser, visual breadboards, 1-click decision chips, Superhuman shortcuts (`Press A`/`Press B`), and interactive Product Architecture Canvas.
+- [**MEOW Migration Report**](meow-migration.md) — Before/after evolution and measured evidence.
+- [**00 Forensic Substrate Report**](00-forensics.md) — Historical forensic report; refresh before treating as current.
+
+## Current Verification Matrix
+
+| Requirement | Current status |
+| :--- | :--- |
+| Root agent playbook exists | [x] `AGENT_PLAYBOOK.md` |
+| Stable workspace wiki exists | [x] `WIKI.md` |
+| Troubleshooting captures reproduced failures | [x] `TROUBLESHOOTING.md` |
+| Root decisions / ADR log exists | [x] `DECISIONS.md` |
+| Current handoff exists | [x] `HANDOFF.md` |
+| Sibling concurrency and latency evidence recorded | [x] [Agent key findings](agent/key-findings.md) |
+| I/O authority, backend, and fixture evidence recorded | [x] [Agent key findings](agent/key-findings.md) |
+| Recoverable turn-boundary compaction and BroccoliDB publication barrier documented | [x] [Architecture guide](recoverable-context-compaction.md) |
+| Lease reconciliation, deadlock, and completion CAS evidence recorded | [x] [Agent key findings](agent/key-findings.md) |
+| One central completion funnel and modern terminal event documented | [x] [Agent key findings](agent/key-findings.md) |
+| One central execution funnel and modern terminal tool event documented | [x] [Agent key findings](agent/key-findings.md) |
+| Approval and permit authority centralized in the execution transaction | [x] [MEOW-011](adr/MEOW-011-execution-approval-admission.md) |
+| One transactional task lifecycle authority and generation fence | [x] [MEOW-012](adr/MEOW-012-transactional-task-lifecycle.md) |
+| Canonical MEOW architecture suite linked | [x] [Whitepaper](meow-whitepaper.md) |
+| Historical forensic report refreshed after 2026-07-09 | [ ] Pending fresh diagnostics |
+| `ROADMAP.md` repaired after bootstrap drift | [ ] Pending roadmap pass |
+
+## Current Source Priority
+
+1. Implementation and package manifests.
+2. Root continuity docs listed above.
+3. Maintained docs under `docs/` and `broccolidb/docs/`.
+4. Historical `.wiki` forensic pages after they are revalidated.
+
+---
+*Custodian: LUMI Agent*
+*Last Updated: 2026-07-26*

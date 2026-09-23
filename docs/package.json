@@ -1,0 +1,31 @@
+{
+	"name": "docs",
+	"version": "1.0.0",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"dev": "mintlify dev",
+		"check": "mintlify broken-links",
+		"rename": "mintlify rename"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"description": "",
+	"dependencies": {
+		"mintlify": "^4.2.644"
+	},
+	"overrides": {
+		"tar-fs": "^3.1.1",
+		"js-yaml": "^4.1.1",
+		"tar": "^7.5.17",
+		"body-parser": "^1.20.4",
+		"axios": "^1.13.5",
+		"qs": "^6.15.2",
+		"express": "^4.21.2",
+		"serve-static": "^1.16.2",
+		"send": "^0.19.1",
+		"path-to-regexp": "^0.1.13",
+		"cookie": "^0.7.2"
+	}
+}

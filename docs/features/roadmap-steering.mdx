@@ -1,0 +1,318 @@
+---
+title: "ROADMAP.md Steering"
+sidebarTitle: "Roadmap Steering"
+description: "Auto-rolling ROADMAP.md gates, internal auto-governance at completion, multi-agent coordination leases, pressure-aware scheduling, version vectors, cognitive partitioning, and VS Code settings in LUMI."
+---
+
+LUMI steers long-running work through a project **`ROADMAP.md`** at the workspace root. Roadmap **governance gates** integrate with the completion pipeline — they can block `attempt_completion` when steering is out of sync.
+
+**Key behavior (2026):** Governance remediation is **internal and automatic** at `attempt_completion`. Agents do **not** need to call `roadmap(action='validate')`, MCP tools, or slash commands to clear routine gates. Under multi-agent environments, the roadmap graduates into a pressure-aware coordination substrate ensuring stable, contention-free concurrent execution.
+
+Implementation: `src/services/roadmap/` · Completion integration: `RoadmapCompletionGate.ts` + `completionGatePipeline.ts` · Shared copy: `RoadmapAutoGovernance.ts`
+
+---
+
+## Auto-governance at completion
+
+When the agent calls `attempt_completion`, LUMI runs **`remediateRoadmapGatesInternally()`** before deciding whether to block:
+
+1. **Bootstrap autofill** — if template placeholder phrases remain and `lumi.roadmap.autoBootstrapFill` is enabled
+2. **Schema validation** — if `validation_pending` or after autofill wrote changes
+3. **Checkpoint date stamp** — if section 11 `**Date:**` is missing or unparsable (mechanical fix only)
+
+All steps use `RoadmapService` directly — no agent tool round-trips.
+
+```text
+attempt_completion
+  → remediateRoadmapGatesInternally (autofill → validate → optional date stamp)
+  → re-evaluate gates
+  → pass OR block with ROADMAP.md edit guidance
+```
+
+If gates still fail after auto-remediation, the agent receives:
+
+- A human-readable gate list with **per-gate edit instructions**
+- A machine-parseable `<roadmap_governance_recovery>` block (RFC 7807-style extension)
+- Explicit guidance: **edit ROADMAP.md** — do not call `validate` or MCP for governance
+
+Mid-task (before completion), agents should **continue working**. The system prompt and write hints say governance runs at `attempt_completion`, not on every ROADMAP edit.
+
+**Preflight readiness** uses a **non-mutating dry-run** (`dryRun: true`): it previews planned remediation steps without writing `ROADMAP.md` or `roadmap-state.json`. Auto-clearable gates (e.g. `validation_pending` only) do not surface as **blockers** in the preflight brief — instead, a non-blocking `<advisory>` in `<completion_gate_readiness>` confirms governance will run at `attempt_completion` (including planned remediation steps). The readiness block also carries a `governance_policy` attribute when the roadmap stage is present. Hard gates (schema errors, missing ROADMAP.md) still appear as blocking issues.
+
+**Mid-task `validation_pending`:** After ROADMAP.md edits, workspace state marks `validation_pending: true`. Status reads (`guide`, `cockpit`, write hints) **do not** auto-validate — agents continue working until `attempt_completion` runs internal remediation.
+
+**Mid-task gate display:** When only auto-clearable gates are closed (`validation_pending`, bootstrap placeholders), steering surfaces show a single informational note — not **⛔ attempt_completion blocked** and not stacked ⚠️ warnings — so agents are not pushed into validate/cockpit loops. The environment block includes an explicit **governance policy** line.
+
+**Validate / bootstrap preview:** `roadmap(action='validate')` and `apply_bootstrap_fill` (preview mode) are **diagnostics only** — responses use `continueTaskMidPass` as the primary next call; autofill writes run at `attempt_completion`.
+
+**Gate recovery copy:** Closed gates use per-gate `edit:` instructions from `GATE_EDIT_INSTRUCTIONS` (explain-gate, completion recovery XML, gate catalog) — file-action-first, not tool loops.
+
+<Note>
+  Optional diagnostics remain available: `/roadmap cockpit`, `/roadmap explain-gate`, `/roadmap explain-stale`, `roadmap(action='doctor')`. Use these for visibility — not as a required validate loop before every completion attempt.
+</Note>
+
+---
+
+## Multi-Agent Coordination & Leases
+
+To support concurrent execution across multiple collaborative agents without write contention, planning overlap, or state corruption, the runtime implements **Execution Ownership Leases**.
+
+### JSON State Representation
+Lease metadata is serialized within the centralized `.dietcode/roadmap-state.json` file. Each lock identifies the task ID, owning agent, acquisition timestamp, and expire target:
+
+```json
+{
+  "runtime_state": {
+    "locks": {
+      "9f23a104": {
+        "owner_agent": "agent_alpha",
+        "leased_at": "2026-06-22T00:03:00.000Z",
+        "expires_at": "2026-06-22T00:08:00.000Z"
+      }
+    }
+  }
+}
+```
+
+### Trace Scenario: Lock Contention & Expiry
+1. **Agent Alpha** acquires a lease on Task `9f23a104` to modify its subtask requirements:
+   ```typescript
+   await service.acquireOrchestrationLease(workspace, "agent_alpha", "9f23a104");
+   // Returns: { success: true, expires_at: "2026-06-22T00:08:00.000Z" }
+   ```
+2. **Agent Beta** simultaneously attempts to rewrite Task `9f23a104`:
+   ```typescript
+   await service.acquireOrchestrationLease(workspace, "agent_beta", "9f23a104");
+   // Returns: { success: false } -> Beta is blocked from modifying this task node.
+   ```
+3. **Lease Cleanup / Release:** Once Alpha completes its edit, it releases the lock:
+   ```typescript
+   await service.releaseOrchestrationLease(workspace, "agent_alpha", "9f23a104");
+   // Lock is deleted; other agents can now acquire the lease.
+   ```
+
+---
+
+## Pressure-Aware Scheduling & Cooldowns
+
+Under production pressure, the runtime actively prevents planning storms, excessive validation cycles, and scheduler congestion by calculating an **Orchestration Pressure Score** (0.0 to 1.0) and running an **Admission Control Queue**.
+
+### Pressure Score Heuristic
+The score is composed of three core stress vectors:
+
+$$\text{Pressure Score} = \min(1.0, \text{locksScore} + \text{tasksScore} + \text{mutationsScore})$$
+
+| Stress Vector | Weight Metric | Cap limit | Example (3 locks, 5 tasks, 1 recent edit) |
+|---|---|---|---|
+| **Active Leases** | 0.20 per active lease | 0.60 max | 3 locks = 0.60 |
+| **Tasks Queue (Now)** | 0.05 per task in Now | 0.20 max | 5 tasks = 0.20 |
+| **Mutation Rate** | 0.10 per mutation in last 5 min | 0.40 max | 1 edit = 0.10 |
+| **Total Pressure Score** | Cumulative sum | **1.00 max** | **0.90** |
+
+### JSON State Representation (`scheduler_state`)
+```json
+{
+  "runtime_state": {
+    "scheduler_state": {
+      "pressure_score": 0.9,
+      "queue_size": 5,
+      "last_cooldown_timestamp": "2026-06-22T00:03:10.000Z"
+    }
+  }
+}
+```
+
+### Trace Scenario: Admission Pacing & Backoff
+1. **Agent Gamma** requests to start a validation cycle (`scheduleAdmission`) when pressure is **0.90**:
+   ```typescript
+   const status = await service.scheduleAdmission(workspace, "agent_gamma", "validate");
+   // Returns: { admitted: false, backoff_ms: 5650 }
+   ```
+2. **Cooldown Enforcement:** The scheduler writes `last_cooldown_timestamp` to state. For the next `5650` milliseconds, any mutation admission from Agent Gamma is deferred.
+3. **Lazy Validation Bypass:** If Agent Gamma triggers a diagnostic validation check within 5 seconds of a previous run, the runtime skips compiling dependencies and parsing files, returning the cached payload:
+   ```typescript
+   // Skips workspace scan if file hash is unchanged:
+   const result = await service.validateRoadmap(workspace); 
+   // Returns cached result instantly in < 2ms (saves ~1.2s IO overhead)
+   ```
+
+---
+
+## Concurrent Continuation & Version Vectors
+
+When agents run recovery cycles, asynchronous tasks, or retry loops, the runtime prevents split-brain recovery races and fork divergence through **Freshness Validation**.
+
+### JSON State Representation
+Monotonic sequence counters track modifications to keys (like continuation anchors):
+
+```json
+{
+  "runtime_state": {
+    "version_vectors": {
+      "recovery_checkpoint_anchor": 4,
+      "9f23a104": 2
+    }
+  }
+}
+```
+
+### Trace Scenario: Divergence Detection during Recovery
+1. **Agent Delta** sets a recovery checkpoint before starting a refactoring cycle:
+   ```typescript
+   await service.recordContinuationAnchor(workspace, "recovery_checkpoint_anchor", "refactor_stage_1");
+   // Version vector for "recovery_checkpoint_anchor" is incremented to 4
+   ```
+2. **Agent Epsilon** (running concurrently) mutates the roadmap or updates the same anchor, incrementing the version vector in the background:
+   ```typescript
+   await service.recordContinuationAnchor(workspace, "recovery_checkpoint_anchor", "refactor_stage_2");
+   // Version vector for "recovery_checkpoint_anchor" is incremented to 5
+   ```
+3. **Divergence Block:** Agent Delta attempts to resume execution assuming the system is still on version `4`:
+   ```typescript
+   const check = await service.verifyAnchorFreshness(workspace, "recovery_checkpoint_anchor", 4);
+   // Returns: { fresh: false, current_version: 5 }
+   // Delta's continuation is rejected to avoid overwriting Epsilon's updates, requiring coordination.
+   ```
+
+---
+
+## Scoped Cognitive Partitioning
+
+As orchestration scales, the roadmap runtime shape-shapes agent views into local operational contexts, preventing cognitive overload and prompt bloat.
+
+### Trace Scenario: Quiet reasoning corridors vs. Verbose views
+Assume Task `9f23a104` is leased by **Agent Alpha**, and Task `77e12f01` is leased by **Agent Beta**.
+
+#### Case A: Agent Alpha requests Cockpit Status (Non-Verbose)
+```typescript
+const cockpit = await buildCockpitPayload(service, workspace, { agentId: "agent_alpha" });
+console.log(cockpit.report);
+```
+**Output Context Block:**
+```text
+🗺️ Roadmap cockpit
+Workspace: /my-project
+Project: E-Commerce Hardening · phase=checkpoint
+
+Focus-Scoped Execution Graph (Now):
+  [1] Optimize Cart Hydration (id: 9f23a104)
+  [2] Unlocked Cleanup Task (id: abc12345)
+  • (Task 77e12f01 owned by Beta is hidden to reduce noise)
+
+Steering Lineage Ledger:
+  • 00:03:00 · file_mutated [agent_alpha] (hash: f12a) · Added hydration test
+```
+
+#### Case B: Agent Alpha requests Cockpit Status with Verbose Escape Hatch (`--verbose`)
+```typescript
+const cockpit = await buildCockpitPayload(service, workspace, { agentId: "agent_alpha", verbose: true });
+console.log(cockpit.report);
+```
+**Output Context Block:**
+```text
+🗺️ Roadmap cockpit
+Workspace: /my-project
+Project: E-Commerce Hardening · phase=checkpoint
+
+Focus-Scoped Execution Graph (Now):
+  [1] Optimize Cart Hydration (id: 9f23a104)
+  [2] Task Locked by Other (id: 77e12f01)
+  [3] Unlocked Cleanup Task (id: abc12345)
+
+Active Lock Alerts:
+  ⚠️ Task 77e12f01 is leased by agent_beta (expires: 2026-06-22T00:08:00.000Z)
+
+Steering Lineage Ledger:
+  • 00:04:12 · file_mutated [agent_beta] (hash: e90b) · Refactored checkouts
+  • 00:03:00 · file_mutated [agent_alpha] (hash: f12a) · Added hydration test
+```
+
+---
+
+## VS Code settings
+
+All settings use the `lumi.roadmap.*` prefix in root `package.json`:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `lumi.roadmap.enabled` | `true` | Master switch for roadmap steering |
+| `lumi.roadmap.autoBootstrap` | `true` | Create `ROADMAP.md` from workspace evidence when missing |
+| `lumi.roadmap.autoBootstrapFill` | `true` | Apply evidence autofill (also runs at completion) |
+| `lumi.roadmap.blockKanbanOnValidationPending` | `true` | Block completion when ROADMAP changed since last validate (auto-cleared at completion) |
+| `lumi.roadmap.blockKanbanOnBootstrapIncomplete` | `true` | Block when bootstrap template phrases remain (autofill runs first) |
+| `lumi.roadmap.warnOnStaleBeforeComplete` | `true` | Block when checkpoint is stale vs git activity |
+| `lumi.roadmap.failClosedCompletionGates` | `true` | Block completion when roadmap gate evaluation throws |
+
+Environment overrides: `MIRA_ROADMAP_*` / `DIETCODE_ROADMAP_*` (see `RoadmapConfig.ts`).
+
+---
+
+## Gate catalog
+
+Gates are defined in `RoadmapGateCatalog.ts`. Blocking gates depend on settings above.
+
+| Gate | Typical auto-fix at completion | If still blocked |
+|------|-------------------------------|------------------|
+| `roadmap_present` | Session auto-bootstrap | Create ROADMAP.md at workspace root |
+| `bootstrap_complete` | Auto-autofill | Edit remaining template phrases |
+| `validation_current` | Auto-validate | Repair schema in ROADMAP.md |
+| `checkpoint_fresh` | Date stamp (missing/invalid date only) | Update section 11 narrative + date |
+| `schema_valid` | — | Repair all 12 required sections |
+
+Stale checkpoint due to **git activity** or **expired age** is not auto-rewritten — the agent must update section 11 content.
+
+---
+
+## Agent tools
+
+| Tool | Role |
+|------|------|
+| `roadmap` | Operator console: guide, checkpoint, cockpit, doctor, diagnostics |
+| `roadmap_checkpoint` | Alias for `roadmap(action='checkpoint')` — evidence before major edits |
+
+`roadmap(action='validate')` still exists for **manual diagnostics** but is **not required** before `attempt_completion`.
+
+Handlers: `RoadmapToolHandler` in `src/core/task/tools/handlers/`.
+
+---
+
+## Slash command
+
+`/roadmap` — parsed in `src/core/slash-commands/index.ts`, executed by `RoadmapSlashCommand`.
+
+Examples:
+
+```text
+/roadmap cockpit
+/roadmap explain-gate
+/roadmap explain-stale
+/roadmap doctor
+```
+
+---
+
+## File watcher
+
+`extension.ts` registers `RoadmapFileWatcher` so external edits to `ROADMAP.md` set `validation_pending` in workspace state. Auto-validation clears this at completion — agents do not need a manual validate step.
+
+---
+
+## Architecture map
+
+| Component | Responsibility |
+|-----------|----------------|
+| `RoadmapCompletionGate.ts` | Pre-completion remediation + block evaluation |
+| `RoadmapAutoGovernance.ts` | Shared copy, gate edit instructions, structured recovery XML |
+| `RoadmapGateCatalog.ts` | Gate definitions and blocking rules |
+| `completionGatePipeline.ts` | Preflight stage `roadmap` + structured error envelope |
+| `roadmap_steering.ts` | System prompt section (auto-governance policy) |
+| `RoadmapNativeBridge.ts` | Post-write hints after ROADMAP.md mutations |
+
+---
+
+## Related
+
+- [Post-mortem: auto-governance rollout](roadmap-auto-governance-postmortem.mdx) — what changed and why
+- [Security — roadmap gates](../SECURITY_BEST_PRACTICES.md)
+- [All tools — roadmap](../tools-reference/all-dietcode-tools.mdx)
+- [Using commands — /roadmap](../core-workflows/using-commands.mdx)

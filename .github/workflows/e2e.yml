@@ -1,0 +1,90 @@
+name: E2E Tests
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        types: [opened, reopened, synchronize, ready_for_review]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    changes:
+        runs-on: ubuntu-latest
+        outputs:
+            code: ${{ steps.filter.outputs.code }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+              id: filter
+              with:
+                  filters: |
+                      code:
+                        - '**'
+                        - '!**/*.md'
+                        - '!**/*.mdx'
+                        - '!docs/**'
+                        - '!CHANGELOG.md'
+                        - '!locales/**'
+                        - '!.github/**'
+                        - '!.wiki/**'
+
+    matrix_prep:
+        needs: changes
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        runs-on: ubuntu-latest
+        outputs:
+            matrix: ${{ steps.set-matrix.outputs.matrix }}
+        steps:
+            - id: set-matrix
+              run: |
+                  echo 'matrix=[{"runner":"ubuntu"},{"runner":"windows"},{"runner":"macos"}]' >> $GITHUB_OUTPUT
+
+    e2e:
+        needs: [changes, matrix_prep]
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        strategy:
+            fail-fast: false
+            matrix:
+                include: ${{ fromJson(needs.matrix_prep.outputs.matrix) }}
+        runs-on: ${{ matrix.runner }}-latest
+        timeout-minutes: 20
+        permissions:
+            id-token: write
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup Node monorepo
+              uses: ./.github/actions/setup-node-monorepo
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install vsce
+              run: npm install -g @vscode/vsce@3.2.1
+
+            - name: Install xvfb on Linux
+              if: matrix.runner == 'ubuntu'
+              run: sudo apt-get update && sudo apt-get install -y xvfb
+
+            # Run optimized E2E tests (eliminates redundant builds)
+            - name: Run E2E tests - Linux
+              if: matrix.runner == 'ubuntu'
+              run: xvfb-run -a npm run test:e2e:optimal
+
+            - name: Run E2E tests - Non-Linux
+              if: matrix.runner != 'ubuntu'
+              run: npm run test:e2e:optimal
+
+            - uses: actions/upload-artifact@v4
+              if: ${{ failure() }}
+              with:
+                  name: playwright-recordings-${{ matrix.runner }}
+                  path: |
+                      test-results/playwright/

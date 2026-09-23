@@ -1,0 +1,1 @@
+../../.dietcoderules/workflows/hotfix-release.md

@@ -1,0 +1,112 @@
+version: 2
+updates:
+    # GitHub Actions (security patches only via grouped weekly PR)
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 5
+      labels:
+          - dependencies
+          - ci
+      commit-message:
+          prefix: "ci"
+          include: scope
+      reviewers:
+          - "CardSorting"
+      groups:
+          github-actions:
+              patterns:
+                  - "*"
+      ignore:
+          # Major action bumps are reviewed manually — avoids v4→v7 mega-PRs
+          - dependency-name: "*"
+            update-types:
+                - version-update:semver-major
+
+    # Main extension dependencies — security + patch updates (no minor/major without review)
+    - package-ecosystem: "npm"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 10
+      labels:
+          - dependencies
+          - security
+      reviewers:
+          - "CardSorting"
+      commit-message:
+          prefix: "chore"
+          include: scope
+      groups:
+          security-updates:
+              applies-to: security-updates
+              patterns:
+                  - "*"
+          npm-patches:
+              patterns:
+                  - "*"
+              update-types:
+                  - patch
+      ignore:
+          - dependency-name: "*"
+            update-types:
+                - version-update:semver-major
+                - version-update:semver-minor
+
+    # Webview UI dependencies — security + patch updates
+    - package-ecosystem: "npm"
+      directory: "/webview-ui"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 10
+      labels:
+          - dependencies
+          - webview
+          - security
+      reviewers:
+          - "CardSorting"
+      commit-message:
+          prefix: "chore"
+          include: scope
+      groups:
+          security-updates:
+              applies-to: security-updates
+              patterns:
+                  - "*"
+          npm-patches:
+              patterns:
+                  - "*"
+              update-types:
+                  - patch
+      ignore:
+          - dependency-name: "@testing-library/*"
+          - dependency-name: "*"
+            update-types:
+                - version-update:semver-major
+                - version-update:semver-minor
+
+    # BroccoliDB substrate package
+    - package-ecosystem: "npm"
+      directory: "/broccolidb"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 5
+      labels:
+          - dependencies
+          - broccolidb
+      reviewers:
+          - "CardSorting"
+      commit-message:
+          prefix: "chore"
+          include: scope
+      groups:
+          all-dependencies:
+              patterns:
+                  - "*"
+      ignore:
+          - dependency-name: "*"
+            update-types:
+                - "version-update:semver-major"
+                - "version-update:semver-minor"
+                - "version-update:semver-patch"

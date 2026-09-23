@@ -1,0 +1,85 @@
+---
+title: "Model Selection Guide"
+description: "Choose an AI provider and model for Plan and Act modes in LUMI."
+---
+
+This guide reflects the **providers wired in this build**. The settings dropdown reads `src/shared/providers/providers.json`; routing is implemented in `src/core/api/index.ts`.
+
+## Supported providers
+
+| Provider key | UI label | Handler |
+|--------------|----------|---------|
+| `openrouter` | OpenRouter | `OpenRouterHandler` (default fallback) |
+| `openai-codex` | ChatGPT Subscription | `OpenAiCodexHandler` |
+| `nousResearch` | NousResearch | `NousResearchHandler` |
+| `cloudflare` | Cloudflare Workers AI | `CloudflareHandler` |
+
+If an unknown provider is selected, `buildApiHandler` falls back to OpenRouter.
+
+## Plan vs Act
+
+LUMI can use **different providers per mode**:
+
+- **Plan mode** — `planModeApiProvider` + plan model IDs
+- **Act mode** — `actModeApiProvider` + act model IDs
+
+Configure both in the LUMI sidebar **Settings** panel.
+
+## How to select a model
+
+<Steps>
+  <Step title="Open LUMI Settings">
+    Click the gear icon in the LUMI sidebar, or run **LUMI: Settings** from the Command Palette.
+  </Step>
+  <Step title="Choose provider">
+    Select one of the four providers for Plan and/or Act mode.
+  </Step>
+  <Step title="Add credentials">
+    Enter the API key or complete OAuth for that provider (see [authorizing](/getting-started/authorizing-with-dietcode)).
+  </Step>
+  <Step title="Pick a model">
+    Choose model ID from the provider's picker. OpenRouter exposes the widest catalog.
+  </Step>
+</Steps>
+
+## Provider notes
+
+### OpenRouter (recommended default)
+
+- Access to many frontier and open models through one API key.
+- Supports reasoning/thinking budget settings when the model allows.
+- Used as fallback when provider routing fails.
+
+### ChatGPT Subscription (`openai-codex`)
+
+- For users with an OpenAI Codex / ChatGPT subscription flow.
+- No separate OpenAI API key billing path.
+
+### NousResearch
+
+- Direct access to NousResearch-hosted models.
+- Requires a NousResearch API key.
+
+### Cloudflare Workers AI
+
+- Requires Cloudflare account ID and API token.
+- Runs inference on Cloudflare's platform.
+
+## Additional provider files
+
+The repository contains handler implementations for other backends under `src/core/api/providers/` (Anthropic, Ollama, Bedrock, etc.) and matching settings components under `webview-ui/src/components/settings/providers/`. Those handlers are **not registered** in `buildApiHandler` in this build — only the four providers above are active.
+
+## Context window & Token Optimization
+
+Large tasks may require models with bigger context windows. LUMI tracks usage in `src/core/context/` and automatically optimizes prompts via the **[TokenIngestionBufferEngine](/architecture/adr-001-token-ingestion-buffer-engine)**:
+
+- **10-Stage DSL Compression**: Transpiles tool outputs, diff headers (`[@diff path Lrange]`), stack traces, and deep file paths to minimize input token costs.
+- **Single-Turn Vision Eviction**: Removes historical base64 image data URLs ($T < \text{active}$), preserving context while saving ~4,000 vision tokens per image per turn.
+- **Hardware & Cloud Prompt Caching**: Normalizes system prompts and sorts tool definitions to achieve **90%+ APC prompt cache hit rates**.
+
+See [context windows](/model-config/context-windows) for general guidance.
+
+## Related
+
+- [Authorizing with LUMI](/getting-started/authorizing-with-dietcode)
+- [Plan & Act modes](/core-workflows/plan-and-act)

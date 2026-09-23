@@ -1,0 +1,93 @@
+---
+title: "What is LUMI?"
+sidebarTitle: "What is LUMI?"
+description: "An AI coding agent in VS Code. Read files, run commands, and build features through natural language."
+---
+
+LUMI is an AI coding agent that runs as a VS Code extension (`CardSorting.lumi`). It gives you direct access to frontier models through supported providers, with approval gates on every file change and shell command.
+
+## Get started
+
+<Steps>
+  <Step title="Install LUMI">
+    Install from the VSIX or Extensions panel. See the [install guide](/getting-started/installing-dietcode).
+  </Step>
+  <Step title="Configure a provider">
+    Choose OpenRouter, ChatGPT Subscription, NousResearch, or Cloudflare Workers AI in Settings.
+    
+    [Model setup →](/getting-started/authorizing-with-dietcode)
+  </Step>
+  <Step title="Start a task">
+    Open the LUMI sidebar and describe what you want to build.
+    
+    [Your first project →](/getting-started/your-first-project)
+  </Step>
+</Steps>
+
+## What LUMI can do
+
+With your permission, LUMI can:
+
+- **Read and write files** — Navigate the workspace, create files, and apply targeted edits. Changes appear in the diff view before you approve.
+- **Run terminal commands** — Execute tests, install packages, and debug with live output.
+- **Use a browser** — Launch Puppeteer to test web apps and capture screenshots.
+- **Connect external tools** — Extend capabilities with [MCP servers](/mcp/mcp-overview).
+- **Delegate to subagents** — Spawn background agents for parallel research or verification ([subagents](/features/subagents)).
+- **Steer with ROADMAP.md** — Optional auto-rolling roadmap gates; validation and autofill run automatically at task completion (`lumi.roadmap.*` settings).
+
+## Core workflows
+
+| Workflow | What it does |
+|----------|--------------|
+| [Plan & Act](/core-workflows/plan-and-act) | Plan mode explores without mutating; Act mode implements. |
+| [Task management](/core-workflows/task-management) | Start, resume, and organize long-running sessions. |
+| [Working with files](/core-workflows/working-with-files) | @ mentions for files, folders, URLs, terminal output, and git. |
+| [Commands](/core-workflows/using-commands) | Slash commands (`/newtask`, `/compact`, `/roadmap`, workflows). |
+| [Checkpoints](/core-workflows/checkpoints) | Snapshot and restore workspace state during a task. |
+
+## Workspace integration
+
+LUMI operates directly on your local project:
+
+- **Local files** — Reads and writes in your workspace; respects `.dietcodeignore`.
+- **Local terminal** — Commands run in your environment with your installed tools.
+- **Local persistence** — Task history and cognitive memory use BroccoliDB (SQLite) on your machine via `@noorm/broccolidb`.
+- **Human-in-the-loop** — Mutating tools require approval unless auto-approve rules allow them.
+
+## Supported model providers
+
+This build wires four providers in `src/core/api/index.ts` (see `src/shared/providers/providers.json`):
+
+| Provider | Use case |
+|----------|----------|
+| **OpenRouter** | Default; broad model catalog with your API key |
+| **ChatGPT Subscription** | OpenAI Codex subscription flow |
+| **NousResearch** | NousResearch-hosted models |
+| **Cloudflare Workers AI** | Cloudflare account + API token |
+
+Plan and Act modes can each use a different provider.
+
+## Internal naming
+
+User-facing copy says **LUMI**. Code and config may still reference **DietCode** (message types, `.dietcoderules/`, `DietCodeDefaultTool`, storage keys) and **Cline** env aliases — expected during the long refactor. See [Product evolution](/EVOLUTION) for the full naming map and timeline.
+
+---
+
+## Why LUMI
+
+- **Agency with control** — Terminal, browser, and file tools with explicit approval.
+- **Local-first context** — BroccoliDB stores task history and memory on disk.
+- **Provider choice** — Switch models without leaving the sidebar.
+- **Extensibility** — MCP, hooks, skills, workflows, and subagents.
+
+[Project map →](/PROJECT_MAP)
+
+## Papers
+
+For design intent and measured architecture of the agent layer:
+
+- [Companion brief](../papers/companion-brief.md) — 5-minute executive summary
+- [Philosophy](../papers/philosophy.md) — calm agency, approval, completion gates
+- [Whitepaper](../papers/whitepaper.md) — full technical specification
+
+Substrate (BroccoliDB): [broccolidb/docs/papers/](../../broccolidb/docs/papers/philosophy.md)

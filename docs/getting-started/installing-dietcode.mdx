@@ -1,0 +1,82 @@
+---
+title: "Installing LUMI"
+description: "Install the LUMI VS Code extension from the marketplace or a VSIX."
+---
+
+## Before you begin
+
+1. Use **VS Code 1.84+** or a compatible fork (Cursor, Windsurf, etc.).
+2. Have an API key ready for at least one [supported provider](/core-features/model-selection-guide).
+3. Optionally disable other LUMI forks to avoid activity bar conflicts.
+
+## Install from Extensions
+
+<Steps>
+  <Step title="Open Extensions">
+    Press `Ctrl/Cmd + Shift + X` or click the Extensions icon.
+  </Step>
+  <Step title="Search for LUMI">
+    Look for **LUMI** published by **CardSorting** (`CardSorting.lumi`).
+  </Step>
+  <Step title="Install and open">
+    Click **Install**, then click the LUMI icon in the Activity Bar.
+  </Step>
+</Steps>
+
+## Install from VSIX
+
+```bash
+code --install-extension lumi-1.0.3.vsix
+# or
+cursor --install-extension lumi-1.0.3.vsix
+```
+
+Build a VSIX from source:
+
+```bash
+npm run install:all
+npm run package
+# Output: dist/*.vsix
+```
+
+## Verify installation
+
+After install you should see:
+
+- Activity bar entry **LUMI** with icon from `assets/icons/`
+- Commands prefixed `lumi.*` (for example `lumi.focusChatInput`, `lumi.generateGitCommitMessage`)
+- Sidebar webview id `lumi.SidebarProvider`
+
+Open Command Palette (`Ctrl/Cmd + Shift + P`) → **LUMI: Jump to Chat Input**.
+
+## Development install
+
+```bash
+npm run install:all
+npm run dev          # extension watch
+npm run dev:webview  # webview Vite dev server (separate terminal)
+```
+
+Press **F5** in VS Code to launch an Extension Development Host.
+
+## Platform notes
+
+| Platform | Notes |
+|----------|-------|
+| macOS / Linux / Windows | Fully supported via VS Code host bridge |
+| Multi-root workspaces | Supported via `src/core/workspace/` |
+| Jupyter notebooks | Toolbar commands: Generate / Explain / Improve cell |
+
+This repository ships a **VS Code extension only**. JetBrains, CLI, and Zed flows described in upstream LUMI docs are not part of this workspace build unless you add separate packages.
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| No LUMI icon | Reload window; check for conflicting LUMI extensions |
+| Webview blank | Run `npm run build:webview` when developing from source |
+| Provider errors | Confirm API key in Settings; see [authorizing](/getting-started/authorizing-with-dietcode) |
+
+## Next step
+
+[Configure a model provider →](/getting-started/authorizing-with-dietcode)

@@ -1,0 +1,32 @@
+name: Welcome
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
+            Thanks for opening your first issue on **LUMI**!
+
+            - Search [existing issues](https://github.com/CardSorting/LUMI/issues) to avoid duplicates
+            - Security bugs: see [SECURITY.md](https://github.com/CardSorting/LUMI/blob/main/SECURITY.md) — do not post details publicly
+            - Governed swarms: [quick reference](https://github.com/CardSorting/LUMI/blob/main/docs/governed-roadmap-projection-quickref.md)
+          pr_message: |
+            Thanks for your first pull request to **LUMI**!
+
+            Please read [CONTRIBUTING.md](https://github.com/CardSorting/LUMI/blob/main/CONTRIBUTING.md) and ensure:
+            - PR title uses Conventional Commits (`feat:`, `fix:`, `docs:`, …) — Dependabot PRs are exempt
+            - CI is green (`Tests`, `E2E`, `CodeQL`)
+            - Governed-execution changes preserve projection invariants (see PR template)

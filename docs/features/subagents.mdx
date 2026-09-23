@@ -1,0 +1,118 @@
+---
+title: "Subagents"
+sidebarTitle: "Subagents"
+description: "Run parallel research agents to explore your codebase without filling the main agent's context window."
+---
+
+Subagents let LUMI schedule up to five focused lanes through a three-request, work-conserving pool. Each lane gets its own prompt, model client, and context window, then returns a detailed result to the parent. Retry backoff releases its execution slot so untouched work keeps moving.
+
+<Tip>
+  Subagents is an experimental feature. Behavior may change in future releases.
+</Tip>
+
+## How It Works
+
+When LUMI uses the `use_subagents` tool, it queues independent lanes by downstream priority. Each one:
+
+- Gets its own prompt describing what to investigate
+- Runs with a separate context window and token budget
+- Can read/search files, run commands, use configured skills and MCP, and edit files when the lane has mutating authority
+- Cannot use the browser, perform web search, or spawn nested subagents
+- Returns a result focused on the most relevant file paths for the main agent to read next
+
+Subagent costs are tracked across every retry and rolled into the parent budget. Progress UI and checkpoint writes are coalesced off the execution path; the parent alone publishes the terminal artifact.
+
+## Enabling Subagents
+
+Subagents are disabled by default. To turn them on:
+
+1. Open LUMI Settings (click the gear icon in the LUMI panel)
+2. Go to **Features**
+3. Under the **Agent** section, toggle **Subagents** on
+
+This setting applies in VS Code via extension state (`StateManager`).
+
+## Using Subagents
+
+LUMI does not automatically decide to use subagents. You need to ask for them in your prompt. When the feature is enabled and you mention subagents (or describe a task that benefits from parallel exploration), LUMI will use the `use_subagents` tool.
+
+Example prompts:
+
+- "Use subagents to explore how authentication works and where the database models are defined"
+- "Spin up subagents to investigate the API routes, the test setup, and the deployment config"
+- "I'm new to this codebase. Use subagents to map out the main entry points, the routing layer, and the data access patterns"
+
+Each subagent prompt should describe a focused scope. Use `[execution_mode:read_only]` for research, `[execution_mode:mutation]` or `[write_set:path]` for writes, and `[depends_on:0]` only for a real dependency on zero-based lane 0. LUMI prioritizes lanes that unblock the longest downstream path and synthesizes the results in the parent.
+You can also run only one subagent when the task is small enough that parallel discovery would be unnecessary overhead.
+
+Deep dive: [Working with subagents](/WORKING_WITH_SUBAGENTS) · Code map in [companion brief](/papers/companion-brief.md).
+
+## Auto-Approve Behavior
+
+Launching a governed subagent batch requires one explicit approval decision recorded by `ExecutionFunnel`; it is not silently auto-approved. The launch intent records whether the proposed lanes declare mutation.
+
+Each child tool operation then enters the identical `ExecutionFunnel` authority under its own task generation and invocation. Read and edit settings may allow an eligible child operation to be approved automatically, but a child never reuses the launch decision or another invocation's permit.
+
+LUMI shows the proposed prompts when requesting launch consent. Tool allowlists, hooks, locks, budgets, replay fencing, and the merge gate remain enforced after approval.
+
+## What Subagents Can Do
+
+Default lanes can use the following tools; named subagent configurations may narrow the allowlist:
+
+| Tool | Purpose |
+|------|---------|
+| `read_file` | Read file contents |
+| `list_files` | List directory contents |
+| `search_files` | Regex search across files |
+| `list_code_definition_names` | List top-level classes, functions, and methods |
+| `execute_command` | Run scoped commands in an authorized mutation lane |
+| `use_skill` | Load and activate skills |
+| `write_to_file`, `replace_in_file` | Write within an authorized mutation lane |
+| MCP tools | Use configured MCP tools and resources in an authorized mutation lane |
+
+Subagents cannot use the browser, perform web searches, or spawn their own subagents.
+
+<Note>
+  Commands run in the background under the parent launch authority. Declare mutation for commands that may modify files or system state.
+  Subagents also benefit from command pipelines and filters to narrow output quickly before reading files, for example `rg ... | sort | uniq`.
+</Note>
+
+## When to Use Subagents
+
+Subagents work best when you need broad context from multiple areas of a codebase at once:
+
+- **Onboarding to an unfamiliar project**: Ask subagents to map out the architecture, key entry points, and data flow in parallel.
+- **Investigating cross-cutting concerns**: Have separate subagents trace authentication, logging, and error handling simultaneously.
+- **Pre-edit research**: Before making changes, use subagents to gather context from related files so the main agent can make informed edits without burning through its context window.
+- **Large codebases**: When reading many files sequentially would consume too much of the main agent's context, subagents let you explore broadly without that tradeoff.
+
+For small, focused tasks where you already know which files to look at, subagents add unnecessary overhead. Just ask LUMI directly.
+
+## Governed parallel swarms (mutation lanes)
+
+When `use_subagents` runs **multiple lanes that edit files** in parallel, LUMI uses the **governed execution harness** — not just read-only research mode.
+
+| Concern | Behavior |
+|---------|----------|
+| File writes | `LockAuthority` for `mutation` lanes; read lanes skip locks |
+| Workspace kanban | Lanes use `[propose_patch:…]` — **never direct kanban writes** |
+| Private progress | `[local_roadmap:progress_note:…]` on agent projection |
+| Swarm success | `MergeGate` + patch reconciliation before seal |
+| Operator view | Incident console shows accepted/rejected patches, commit status |
+
+**Quick start for roadmap-aware swarms:**
+
+```
+[execution_mode:mutation] [roadmap_item:NOW-42]
+[local_roadmap:progress_note:NOW-42:implementing feature]
+[propose_patch:attach_evidence:NOW-42:evidence=tests/feature.test.ts|rationale=tests pass|confidence=0.9]
+```
+
+Full reference: [Roadmap projection quick reference](/governed-roadmap-projection-quickref) · [Governed subagent execution](/governed-subagent-execution) · [Runbook](/governed-execution-runbook).
+
+## High-Throughput Swarm Telemetry & Streaming Ergonomics
+
+When multi-agent swarms stream continuous progress notes, subagent logs, and tool execution events in parallel, message updates pass through the decoupled `ChatMessagesContext` (see [ADR-002](/architecture/adr-002-webview-state-decoupling-and-streaming-optimization)):
+
+- **Non-blocking UI Streaming**: High-frequency subagent message streams push directly to `ChatMessagesContext`, bypassing global `ExtensionStateContext` state updates so that non-chat webview components (settings, MCP, worktree panels) remain completely unaffected.
+- **WeakMap Telemetry Caching**: Subagent progress rows and tool result projections use `projectionCache` and `apiUsageCache` by immutable message reference, ensuring sub-millisecond per-frame render times even during concurrent 5-lane swarm execution.

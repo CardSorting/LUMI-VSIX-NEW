@@ -1,0 +1,1 @@
+export { DietCodeTempManager } from "./DietCodeTempManager"

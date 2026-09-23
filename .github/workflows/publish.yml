@@ -1,0 +1,198 @@
+name: "Publish Release"
+
+on:
+    workflow_dispatch:
+        inputs:
+            release-type:
+                description: "Choose release type (release or pre-release)"
+                required: true
+                default: "release"
+                type: choice
+                options:
+                    - pre-release
+                    - release
+            tag:
+                description: "Enter existing tag to publish (e.g., v3.1.2)"
+                required: true
+                type: string
+
+concurrency:
+    group: publish-${{ github.event.inputs.tag }}
+    cancel-in-progress: false
+
+permissions: read-all
+
+jobs:
+    test:
+        uses: ./.github/workflows/test.yml
+
+    build-targets:
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+        name: Build Extension (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        permissions:
+            contents: read
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag }}
+                  fetch-depth: 0
+                  fetch-tags: true
+
+            - name: Setup Node monorepo
+              uses: ./.github/actions/setup-node-monorepo
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install native protoc on Apple Silicon
+              if: runner.os == 'macOS' && runner.arch == 'ARM64'
+              env:
+                  HOMEBREW_NO_AUTO_UPDATE: "1"
+                  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+                  HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
+              run: command -v protoc || brew install protobuf
+
+            - name: Package targeted VSIX files
+              env:
+                  DIETCODE_ENVIRONMENT: production
+                  TELEMETRY_SERVICE_API_KEY: ${{ secrets.TELEMETRY_SERVICE_API_KEY }}
+                  ERROR_SERVICE_API_KEY: ${{ secrets.ERROR_SERVICE_API_KEY }}
+                  # OpenTelemetry production defaults (can be overridden at runtime)
+                  OTEL_TELEMETRY_ENABLED: ${{ secrets.OTEL_TELEMETRY_ENABLED }}
+                  OTEL_LOGS_EXPORTER: otlp
+                  OTEL_METRICS_EXPORTER: otlp
+                  OTEL_EXPORTER_OTLP_PROTOCOL: ${{ secrets.OTEL_EXPORTER_OTLP_PROTOCOL }}
+                  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
+                  OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+              run: |
+                  npm run ci:build
+                  npm run package:vsix:all
+                  npm run doctor -- --ci
+
+            - name: Upload targeted VSIX
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vsix-${{ runner.os }}-${{ runner.arch }}
+                  path: dist/*.vsix
+                  if-no-files-found: error
+
+    publish:
+        needs: [test, build-targets]
+        name: Publish Extension
+        runs-on: ubuntu-latest
+        environment: publish
+        permissions:
+            contents: write
+            packages: write
+            id-token: write
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag }}
+                  fetch-depth: 0
+                  fetch-tags: true
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Install Publishing Tools
+              run: npm install -g @vscode/vsce@3.7.1 ovsx@0.10.6
+
+            - name: Download targeted VSIX packages
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: vsix-*
+                  path: dist
+                  merge-multiple: true
+
+            - name: Get Version
+              id: get_version
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+            - name: Validate Tag
+              id: validate_tag
+              run: |
+                  TAG="${{ github.event.inputs.tag }}"
+                  echo "tag=$TAG" >> $GITHUB_OUTPUT
+                  echo "Using existing tag: $TAG"
+                  git rev-parse "$TAG" >/dev/null
+
+            - name: Publish all platform targets
+              env:
+                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
+                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
+              run: |
+                  mapfile -t VSCODE_VSIX < <(find dist -maxdepth 1 -name 'lumi-vscode-*.vsix' -print | sort)
+                  if [ "${#VSCODE_VSIX[@]}" -eq 0 ]; then
+                    echo "No VS Code Marketplace VSIX files found"
+                    exit 1
+                  fi
+                  VSCE_ARGS=(publish --packagePath "${VSCODE_VSIX[@]}")
+                  if [ "${{ github.event.inputs.release-type }}" = "pre-release" ]; then
+                    VSCE_ARGS+=(--pre-release)
+                  fi
+                  vsce "${VSCE_ARGS[@]}"
+
+                  node scripts/setup-openvsx-namespace.mjs
+                  for vsix in dist/lumi-[0-9]*.vsix; do
+                    OVSX_ARGS=(publish -i "$vsix" -p "$OVSX_PAT")
+                    if [ "${{ github.event.inputs.release-type }}" = "pre-release" ]; then
+                      OVSX_ARGS+=(--pre-release)
+                    fi
+                    ovsx "${OVSX_ARGS[@]}"
+                  done
+
+                  echo "Published ${{ steps.get_version.outputs.version }} for all built platform targets"
+
+            - name: Get Previous Tag
+              id: prev_tag
+              run: |
+                  CURRENT_TAG="${{ steps.validate_tag.outputs.tag }}"
+                  PREV_TAG=$(git describe --tags --abbrev=0 "$CURRENT_TAG^" 2>/dev/null || echo "")
+                  echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+            - name: Get Changelog Entry
+              id: changelog
+              run: |
+                  CONTENT=$(awk '/^## \[/{if(found) exit; found=1; next} found{print}' CHANGELOG.md)
+                  {
+                    echo "content<<EOF"
+                    echo "$CONTENT"
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Install cosign
+              uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+            - name: Sign release artifacts
+              run: |
+                  for vsix in dist/lumi-vscode-*.vsix dist/lumi-[0-9]*.vsix; do
+                    [ -f "$vsix" ] || continue
+                    cosign sign-blob --yes --output-signature "${vsix}.sig" --output-certificate "${vsix}.pem" "$vsix"
+                  done
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.validate_tag.outputs.tag }}
+                  files: |
+                      dist/lumi-vscode-*.vsix
+                      dist/lumi-[0-9]*.vsix
+                      dist/*.sig
+                      dist/*.pem
+                  body: |
+                      ${{ steps.changelog.outputs.content }}
+
+                      **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.prev_tag }}...${{ steps.validate_tag.outputs.tag }}
+                  prerelease: ${{ github.event.inputs.release-type == 'pre-release' }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

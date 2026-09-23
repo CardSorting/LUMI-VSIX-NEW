@@ -1,0 +1,1 @@
+../../.dietcoderules/workflows/release.md

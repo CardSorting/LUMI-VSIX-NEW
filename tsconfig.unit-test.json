@@ -1,0 +1,27 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"incremental": true,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.unit-test.tsbuildinfo",
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"typeRoots": [
+			"./node_modules/@types",
+			"./src/types"
+		]
+	},
+	"ts-node": {
+		"require": [
+			"tsconfig-paths/register"
+		],
+		"transpileOnly": true
+	},
+	"include": [
+		"src/**/*.ts",
+		"test/**/*.ts",
+		"src/test/requires-global.d.ts"
+	],
+	"exclude": [
+		"node_modules"
+	]
+}

@@ -1,0 +1,6 @@
+name: "LUMI CodeQL"
+
+# Only scan first-party source — avoids walking node_modules and build output.
+paths:
+  - src
+  - webview-ui/src

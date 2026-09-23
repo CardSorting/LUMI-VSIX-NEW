@@ -1,0 +1,75 @@
+# Agent Memory
+
+## Durable Constraints
+
+- `.dietcodeignore` remains the read/write security boundary. Workspace-local query auto-authority must never bypass it.
+- Command permission parsing and approval remain fail-closed. Central command safety is derived from the exact declared command; model-provided risk hints cannot make an unknown command safe.
+- Initial checkpoints still serialize mutations, but read-only tools may proceed while the checkpoint commit is pending.
+- Scheduled completion-audit persistence and roadmap finalization are best-effort. Completion audit evaluation, optional workspace audit artifacts, message persistence, and checkpoint saving still occupy synchronous portions of completion.
+- Completed I/O cache entries are invalid after local mutation; reset the task coalescer generation. Unknown shell/MCP operations invalidate conservatively, and mutations affecting `.dietcodeignore` refresh policy synchronously before later reads.
+- Path-authority records are immutable and scoped by workspace identity, filesystem generation, and ignore-policy generation. Never cache approval, credential, destructive-action authorization, external-path results, or mutable validation failures.
+- Eligible sibling batches use a task-associated scheduler with capacity four. Backend budgets are class-specific: metadata/small reads may use four slots while repository searches and traversals are capped at two. Task abort signals and joins both sibling and direct single-operation I/O; tools must honor the invocation signal and must not project after it is aborted.
+- Scheduled tool results are invocation-local. Canonical results are projected in model-emission order before advisory query-card replay; auto-approved local query presentation overlaps backend work. Non-query and interactive presentation remains shared. Do not append concurrent results directly to `TaskState.userMessageContent`.
+- All sibling mutations remain one lane because the classifier adds a shared `workspace-mutation` claim. Task verification commands share a `command-lane`; mutating/unknown commands fence the workspace.
+- Commands classified by the canonical JoyRide policy as `verification` or `safe-readonly` may overlap read-only diagnostics; shell operators, installs, builds, unknown commands, and environment mutations retain the workspace-wide fence.
+- `ExecutionFunnel.ts` is the sole approval and tool-execution authority. Parent, sibling, and subagent callers enter it; `ToolExecutorCoordinator` is a registry and owns no dispatch or approval path.
+- Approval is part of execution admission. The funnel freezes a handler's pure `ApprovalIntent`, evaluates current settings/policy, records one immutable decision, and only then issues an invocation- and generation-scoped permit. Missing/malformed intents and stale decisions fail closed.
+- `ExecutionFunnelEvent` is the one execution projection. It causally links intent, policy inputs, prompt, decision, and permit in one ordered trace. Consumers select a whole event; never infer status from handler prose or merge different invocation events.
+- `TaskLifecycleFunnel.ts` is the sole task-state transition authority. Callers submit typed generation-bound intents; they never assign lifecycle state, cancellation, terminal outcome, or generation.
+- `TaskLifecycleEvent` is the one lifecycle projection. Record + event commit atomically by generation/revision CAS before publication. `TaskState`, controller transport, history recovery, and webview status consume it without repair or fallback inference.
+- Cancellation request and settlement are distinct. A committed request fences new execution immediately; terminal cancellation requires later settlement. A terminal generation never resumes, and a replacement generation rejects all old callbacks and permits.
+- Attached subagents share the parent funnel, name the exact parent generation, and terminalize before parent completion/replacement. Parent cancellation/failure/timeout propagates through typed child intents; detached children are independent.
+- Turn control has no legacy boolean fallback. Conditional mutation collision paths come from the frozen intent, and `npm run check:handler-imports` enforces that handlers do not reacquire approval authority.
+- `CommandExecutor` owns shell process timeout/cancellation. The funnel sets no competing shell timeout or retry, so it cannot start a replacement while an original process is alive; all advisory notification timers clear in `finally`. Scoped cancellation uses `cancelBackgroundCommand(ownerId)` and `hasActiveBackgroundCommand(ownerId)`.
+- Swarm execution lane concurrency must be controlled by tracking active execution slots in the pool (`running.size`) rather than yielded/suspended lifecycle states (`activeLaneExecutions`) to prevent premature queue saturation during setup.
+- Swarm resumes must check and validate that a candidate governed authority receipt is sealed and has valid integrity with a matching checksum before reusing historical agent work; unsealed or missing receipt evidence requires the lane to restart.
+- Subagents apply repetition detection (`MAX_CONSECUTIVE_IDENTICAL_CALLS = 3`) to self-correct with a nudge to re-evaluate or ask a follow-up, and signal a toxic hotspot to the parent swarm.
+- Subagent completion or failure envelopes must only be published after durably flushing the transcript. Flushes must be atomic (writing to a temporary file and renaming) to prevent JSONL corruption/duplication under deferred write-behind scheduling.
+- Context compaction is a request projection, not source-text mutation.
+  BroccoliDB CAS plus stable-ID SQLite rows are the centralized exact-source
+  recovery authority for parent and subagent scopes. `<transcript>.context/` is
+  only the isolated no-central-store fallback. A compact projection intentionally
+  does not claim semantic or syntactic completeness.
+- Never expose a new projection marker until `writeDurableBatch()` commits its
+  source, projection, cursor, and run rows and the post-commit CAS presence check
+  succeeds. On failure, restore the pre-pass manager state and keep raw context.
+- Persist scan-only cursor movement; otherwise restored agents repeatedly inspect
+  and hash the same old history.
+- Once a subagent block is projected, later passes reuse it or roll complete pairs; never hash the projection and persist it as if it were the exact source.
+- Passive compaction occurs only after a turn is complete and before the next provider request. Never compact within an active API stream, tool stream, or unsettled child process.
+- `getCompactionTierFromTokens()` is the one tier authority. Each progressive pass must retain hard message, block, candidate, projected-line, materialized-line, source-character, and per-pattern-input budgets.
+- Never split an unbounded or newline-dense payload directly. `ContextPruner` caps source analysis at 2,000,000 characters, 20,000 materialized lines, and 4,096 characters per regex input while hashing and line-counting the complete source.
+- Compact only old, supported, read-like tool evidence. Keep recent turns, unknown tool outputs, completion evidence, mutations, and short outputs raw. V2 recovery authority is source + message UUID + block UUID + SHA-256, never array position.
+- Raw prompt text cannot assert internal projection authority. Escape forged `<system_context_projection>` signatures, then reapply trusted markers from identity-indexed state. Add the projection interpretation system policy only when that sanitized request contains a trusted marker.
+- `context_history.json` is a parent-owned compatibility/cache sidecar.
+  Same-process managers use path-keyed merge serialization; central
+  cross-process writes use SQLite/WAL and content-addressed CAS.
+- Production coordination authority is immutable `sqlite`. A database failure raises `DATABASE_AUTHORITY_UNAVAILABLE`; never adopt memory or filesystem state as fallback authority.
+- Lease identity is `resource + ownerId + leaseEpoch + fencingToken + authorityMode`. Epochs and tokens are decimal strings/`bigint`, never JavaScript `number`.
+- Memory, governed lock files, and Broccoli fences are projections. Reconciliation requires a database-available snapshot; malformed or clock-skewed records fail closed and remain on disk.
+- Guided Spec Mode (`AUTO`) is a deterministic execution wrapper layered over the core LLM engine. When `mode === "auto"`, `PromptBuilder.ts` automatically injects `# SYSTEM OVERRIDE: LUMI GUIDED SPEC MODE`, banning raw markdown code blocks, raw shell execution, and speculative developer language.
+- Every assistant response in `AUTO` mode must adhere to 4-block structured product specification formatting (Block 1 Breadboard Spec, Block 2 Milestone Stepper, Block 3 Decision Waypoint, Block 4 Decision Chips). `parseGuidedSpecOutput` (`parser.ts`) extracts state in real time.
+- State 4 (`HANDOFF`) auto-generates a rollback restoration point (`📸 Snapshot Ready`). Non-technical stakeholders steer feature builds via 1-click decision chips, single-key Superhuman shortcuts (`Press A`/`Press B`), decision rationale trade-off drawers, and an interactive **Product Architecture Canvas Drawer**.
+
+- Deadlock recovery requires a typed immutable scheduler snapshot, an SCC with no timer/lease/owner/capacity escape, and unchanged scheduler plus lane versions at apply time.
+- Task completion is terminal only after the `task_completions` `BEGIN IMMEDIATE` CAS verifies the current lease generation and unchanged task state version. Sibling validation command runs as a separately admitted invocation after the original completion permit is released, coordinated via a state-machine that claims dispatch atomically under `evidence_dispatching`. Never use raw database connections or synchronous getters in domain logic; read execution evidence through narrow repository functions.
+
+## Validation Coupling
+
+- When touching execution, approval, or query authority, run `ExecutionFunnel.test.ts`, `tool-executor-hooks.test.ts`, sibling/subagent parity tests, `GoldenCartridgeToolHandler.test.ts`, and `parentIoThroughput.test.ts`.
+- When touching path/cache generations, run `TaskPathAuthorityCache.test.ts`, `TaskIoBackend.test.ts`, both ignore-controller suites, and `IoRequestCoalescer` coverage in `parentIoThroughput.test.ts`.
+- When touching read/list/search backends, run `extract-text.test.ts`, `glob/list-files.test.ts`, `ripgrep/index.test.ts`, and `languageParserCache.test.ts`.
+- When touching completion audit persistence, run `completionAuditResilience.test.ts` and `Orchestrator.test.ts`.
+- When touching roadmap lifecycle or progress, run `RoadmapCompletionGate.test.ts` and `RoadmapToolJournal.test.ts`.
+- When touching sibling scheduling, run the dependency, scheduler, performance, invocation-context, task-batch, tool-call processor, and parent-I/O suites under `--no-config`.
+- When touching subagent concurrency, resume logic, repetition checks, or transcript recording, run `SubagentRunner.test.ts` and `executionHarnessGaps.test.ts` under `--timeout 10000`.
+- When touching context thresholds, pruning, history projection, rollover,
+  central persistence, or subagent compaction, run `ContextPruner.test.ts`,
+  `ContextManager.test.ts`, `BroccoliContextCompactionStore.test.ts`,
+  BroccoliDB’s `context-compaction.test.ts` and `capability-contract.test.ts`,
+  the complete `SubagentRunner.test.ts`, TypeScript, handler-import, and
+  task-lifecycle boundary checks.
+- When touching coordination authority or projections, run `LockAuthorityReconciliation.test.ts` and the governed execution hardening/reliability suites.
+- When touching scheduler wait state or lane transitions, run `TarjanDeadlockDetector.test.ts` and `SubagentToolHandler.test.ts`.
+- When touching completion identity, lease binding, or terminal persistence, run `TaskCompletionTerminalization.test.ts` plus completion lifecycle/gate tests.
+- When touching task lifecycle, run `TaskLifecycleFunnel.test.ts`, `ExecutionFunnel.test.ts`, `CompletionFunnel.test.ts`, subagent parity, and `npm run check:task-lifecycle-boundary`.
